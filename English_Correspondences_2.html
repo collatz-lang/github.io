@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>English Correspondences</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d; --surface: #141414; --surface2: #1c1c1c;
+    --border: #2a2a2a; --accent1: #c8a96e; --accent2: #6e9fc8;
+    --accent3: #c86e6e; --accent4: #6ec88a; --text: #e8e4dc;
+    --muted: #7a7570;
+    --accent5: #b06ec8; --mono: 'DM Mono', monospace;
+    --serif: 'Playfair Display', serif; --sans: 'Noto Sans JP', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.7; padding: 40px 20px 80px; }
+  .container { max-width: 860px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 48px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+  h1 { font-family: var(--serif); font-size: 2.2rem; color: var(--accent1); letter-spacing: 0.02em; margin-bottom: 8px; cursor: pointer; user-select: none; }
+  .subtitle { color: var(--muted); font-size: 13px; }
+  section { margin-bottom: 48px; }
+  h2 { font-family: var(--serif); font-size: 1.3rem; color: var(--accent1); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 0.95rem; color: var(--accent2); margin: 24px 0 8px; font-family: var(--mono); }
+  .rule-desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.6; }
+  .rule-formula { font-family: var(--mono); font-size: 13px; color: var(--accent2); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; display: inline-block; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  thead th { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 8px 12px; vertical-align: top; }
+  .td-pie   { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .td-latin { font-family: var(--mono); font-size: 13px; color: var(--accent1); white-space: nowrap; }
+  .td-greek { font-family: var(--mono); font-size: 13px; color: var(--accent2); white-space: nowrap; }
+  .td-germanic { font-family: var(--mono); font-size: 13px; color: var(--accent4); white-space: nowrap; }
+  .td-meaning { color: var(--text); font-size: 13px; }
+  .td-examples { font-size: 12px; color: var(--muted); font-style: italic; }
+
+  /* s↔h テーブル */
+  .sh-table tbody tr:hover { background: var(--surface); }
+
+  /* グリムの法則テーブル */
+  .grimm-table tbody tr { cursor: pointer; }
+  .grimm-table tbody tr:hover { background: var(--surface); }
+  .td-deriv {
+    font-size: 11px; color: var(--accent1); font-style: italic;
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease, padding-top 0.3s ease;
+    padding-top: 0;
+  }
+  .grimm-table tbody tr.expanded .td-deriv {
+    max-height: 40px; opacity: 1; padding-top: 3px;
+  }
+  .expand-hint { font-size: 9px; color: var(--muted); margin-left: 4px; display: inline-block; transition: transform 0.2s; }
+  .grimm-table tbody tr.expanded .expand-hint { transform: rotate(90deg); }
+
+  /* 同語源ペアテーブル */
+  .pair-table tbody tr:hover { background: var(--surface); }
+
+  .note { font-size: 12px; color: var(--muted); margin-top: 12px; padding: 10px 14px; border-left: 2px solid var(--border); line-height: 1.6; }
+  .toc-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text); font-size: 13px; font-family: var(--sans);
+    padding: 0; text-align: left;
+  }
+  .toc-btn:hover { color: var(--accent1); }
+  .legend { display: flex; gap: 20px; margin-bottom: 24px; font-size: 12px; font-family: var(--mono); flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-dot.latin { background: var(--accent1); }
+  .legend-dot.greek { background: var(--accent2); }
+  .legend-dot.germanic { background: var(--accent4); }
+  .legend-dot.pie { background: var(--muted); }
+
+  @media (max-width: 600px) {
+    body { padding: 24px 14px 60px; font-size: 13px; }
+    h1 { font-size: 1.6rem; }
+    .pair-table thead { display: none; }
+    .pair-table tbody tr {
+      display: flex;
+      flex-direction: column;
+      padding: 10px 0;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pair-table tbody tr td {
+      padding: 2px 8px;
+      white-space: normal;
+    }
+    .pair-table td.td-latin::before {
+      content: '対応：';
+      color: var(--muted);
+      font-size: 10px;
+      display: block;
+      letter-spacing: 0.05em;
+    }
+    .pair-table td.td-germanic::before {
+      content: '単語：';
+      color: var(--muted);
+      font-size: 10px;
+      display: block;
+      letter-spacing: 0.05em;
+    }
+    .pair-table td.td-meaning::before {
+      content: '説明：';
+      color: var(--muted);
+      font-size: 10px;
+      display: block;
+      letter-spacing: 0.05em;
+    }
+    table:not(.pair-table) { display: block; overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1 id="title">
+    <span class="plain">English Correspondences</span>
+    <span class="colored" style="display:none"><span style="color:#6ec88a">Engl</span><span style="color:#6ec88a">ish</span> <span style="color:#c8a96e">Cor</span><span style="color:#c8a96e">re</span><span style="color:#c8a96e">spond</span><span style="color:#c8a96e">ences</span></span>
+  </h1>
+  <p class="subtitle">印欧祖語から英語への音変化と、ラテン語・ギリシャ語・ゲルマン語の対応関係</p>
+</header>
+
+
+<nav style="margin-bottom:40px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 20px;">
+  <p style="font-family:var(--mono); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;">目次</p>
+  <ol style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
+    <li><button onclick="document.getElementById('sec-sh').scrollIntoView({behavior:'smooth'})" class="toc-btn">1. s ↔ h 対応（ラテン語 vs ギリシャ語）</button></li>
+    <li><button onclick="document.getElementById('sec-grimm').scrollIntoView({behavior:'smooth'})" class="toc-btn">2. グリムの法則（ラテン語・ギリシャ語 vs ゲルマン語）</button></li>
+    <li><button onclick="document.getElementById('sec-verner').scrollIntoView({behavior:'smooth'})" class="toc-btn">3. ヴェルネルの法則</button></li>
+    <li><button onclick="document.getElementById('sec-layers').scrollIntoView({behavior:'smooth'})" class="toc-btn">4. 英語の三層構造</button></li>
+    <li><button onclick="document.getElementById('sec-numerals').scrollIntoView({behavior:'smooth'})" class="toc-btn">5. 数詞の対応（1〜10）</button></li>
+  </ol>
+</nav>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot pie"></div>印欧祖語</div>
+  <div class="legend-item"><div class="legend-dot latin"></div>ラテン語</div>
+  <div class="legend-item"><div class="legend-dot greek"></div>ギリシャ語</div>
+  <div class="legend-item"><div class="legend-dot germanic"></div>ゲルマン語（古英語）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent5)"></div>フランス語</div>
+</div>
+
+<section>
+  <h2 id="sec-sh">s ↔ h 対応（ラテン語 vs ギリシャ語）</h2>
+  <p class="rule-desc">印欧祖語の語頭 *s がラテン語ではそのまま s として残り、ギリシャ語では気息音 h に変化した。同じ概念を表す形態素がラテン語とギリシャ語で異なる音を持つため、英語には両方が接頭辞として残っている。</p>
+  <div class="rule-formula">印欧祖語 *s → ラテン s / ギリシャ h</div>
+  <table class="sh-table">
+    <thead><tr><th>ラテン系接頭辞</th><th>ギリシャ系接頭辞</th><th>意味</th><th>英語での例</th></tr></thead>
+    <tbody>
+      <tr><td class="td-latin">semi-</td><td class="td-greek">hemi-</td><td class="td-meaning">半分</td><td class="td-examples">semicircle, hemisphere</td></tr>
+      <tr><td class="td-latin">sub-</td><td class="td-greek">hypo-</td><td class="td-meaning">下に・不足</td><td class="td-examples">submarine, hypothesis</td></tr>
+      <tr><td class="td-latin">super-</td><td class="td-greek">hyper-</td><td class="td-meaning">上に・超えて</td><td class="td-examples">supernatural, hyperactive</td></tr>
+      <tr><td class="td-latin">sex-</td><td class="td-greek">hex-</td><td class="td-meaning">6</td><td class="td-examples">sextuple, hexagon</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2 id="sec-grimm">グリムの法則（ラテン語・ギリシャ語 vs ゲルマン語）</h2>
+  <p class="rule-desc">19世紀の言語学者ヤーコプ・グリムが発見した、印欧祖語の閉鎖音がゲルマン語で系統的に変化する規則。<br><span style="color:var(--accent2); font-size:12px;">行をタップすると派生語が表示されます。</span></p>
+
+  <h3>p → f</h3>
+  <div class="rule-formula">印欧祖語 *p → ゲルマン f</div>
+  <table class="grimm-table">
+    <thead><tr><th>印欧祖語</th><th>ラテン/ギリシャ</th><th>英語（ゲルマン）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-pie">*pəter-</td><td class="td-latin">pater（ラテン）<div class="td-deriv">paternal, paternity, patron</div></td><td class="td-germanic">father</td><td class="td-meaning">父 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*peisk-</td><td class="td-latin">piscis（ラテン）<div class="td-deriv">piscine, Pisces</div></td><td class="td-germanic">fish</td><td class="td-meaning">魚 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*ped-</td><td class="td-latin">pes/pedis（ラテン）<div class="td-deriv">pedal, pedestrian, impede</div></td><td class="td-germanic">foot</td><td class="td-meaning">足 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*plew-</td><td class="td-latin">pluvia（ラテン）<div class="td-deriv">pluvial, pluvious</div></td><td class="td-germanic">flow</td><td class="td-meaning">流れる <span class="expand-hint">▸</span></td></tr>
+    </tbody>
+  </table>
+  
+  <h3>k → h</h3>
+  <div class="rule-formula">印欧祖語 *k → ゲルマン h</div>
+  <table class="grimm-table">
+    <thead><tr><th>印欧祖語</th><th>ラテン/ギリシャ</th><th>英語（ゲルマン）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-pie">*kwon-</td><td class="td-latin">canis（ラテン）<div class="td-deriv">canine, kennel</div></td><td class="td-germanic">hound</td><td class="td-meaning">犬 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*kmtom</td><td class="td-latin">centum（ラテン）<div class="td-deriv">century, cent, centimeter</div></td><td class="td-germanic">hundred</td><td class="td-meaning">100 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*kerd-</td><td class="td-greek">kardia（ギリシャ）<div class="td-deriv">cardiac, cardiology</div></td><td class="td-germanic">heart</td><td class="td-meaning">心臓 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*korn-</td><td class="td-latin">granum（ラテン）<div class="td-deriv">grain, granule, granite</div></td><td class="td-germanic">corn</td><td class="td-meaning">穀物 <span class="expand-hint">▸</span></td></tr>
+    </tbody>
+  </table>
+  
+  <h3>t → th</h3>
+  <div class="rule-formula">印欧祖語 *t → ゲルマン þ（th）</div>
+  <table class="grimm-table">
+    <thead><tr><th>印欧祖語</th><th>ラテン/ギリシャ</th><th>英語（ゲルマン）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-pie">*treyes</td><td class="td-latin">tres（ラテン）<div class="td-deriv">triple, trio, triangle</div></td><td class="td-germanic">three</td><td class="td-meaning">3 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*tu</td><td class="td-latin">tu（ラテン）<div class="td-deriv">—</div></td><td class="td-germanic">thou / you</td><td class="td-meaning">あなた <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*dent-</td><td class="td-latin">dens/dentis（ラテン）<div class="td-deriv">dental, dentist, indent</div></td><td class="td-germanic">tooth</td><td class="td-meaning">歯 <span class="expand-hint">▸</span></td></tr>
+    </tbody>
+  </table>
+  
+  <h3>b → p</h3>
+  <div class="rule-formula">印欧祖語 *b → ゲルマン p</div>
+  <table class="grimm-table">
+    <thead><tr><th>印欧祖語</th><th>ラテン/ギリシャ</th><th>英語（ゲルマン）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-pie">*nebh-</td><td class="td-latin">nebula（ラテン）<div class="td-deriv">nebula, nebulous</div></td><td class="td-germanic">navel</td><td class="td-meaning">へそ・中心 <span class="expand-hint">▸</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>d → t</h3>
+  <div class="rule-formula">印欧祖語 *d → ゲルマン t</div>
+  <table class="grimm-table">
+    <thead><tr><th>印欧祖語</th><th>ラテン/ギリシャ</th><th>英語（ゲルマン）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-pie">*dekm</td><td class="td-latin">decem（ラテン）<div class="td-deriv">decimal, decade</div></td><td class="td-germanic">ten</td><td class="td-meaning">10 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*dwo</td><td class="td-latin">duo（ラテン）<div class="td-deriv">dual, duo, double</div></td><td class="td-germanic">two</td><td class="td-meaning">2 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*med-</td><td class="td-latin">medius（ラテン）<div class="td-deriv">medium, median, mediate</div></td><td class="td-germanic">mid</td><td class="td-meaning">中間 <span class="expand-hint">▸</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>g → k</h3>
+  <div class="rule-formula">印欧祖語 *g → ゲルマン k</div>
+  <table class="grimm-table">
+    <thead><tr><th>印欧祖語</th><th>ラテン/ギリシャ</th><th>英語（ゲルマン）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-pie">*genu-</td><td class="td-latin">genu（ラテン）<div class="td-deriv">genuine, genual</div></td><td class="td-germanic">knee</td><td class="td-meaning">膝 <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*gel-</td><td class="td-latin">gelu（ラテン）<div class="td-deriv">gelatin, glacier, congeal</div></td><td class="td-germanic">cold</td><td class="td-meaning">冷たい <span class="expand-hint">▸</span></td></tr>
+      <tr><td class="td-pie">*gno-</td><td class="td-latin">gnoscere（ラテン）<div class="td-deriv">know, cognition, recognize</div></td><td class="td-germanic">know</td><td class="td-meaning">知る <span class="expand-hint">▸</span></td></tr>
+    </tbody>
+  </table>
+
+
+  <p class="note">グリムの法則により、英語の日常語（father・fish・foot・heart など）とラテン語・ギリシャ語由来の学術語（paternal・piscine・pedal・cardiac など）が同語源のペアを形成している。英語の語彙の二重構造の主要な原因のひとつ。</p>
+</section>
+
+
+  <h2 id="sec-verner" style="margin-top:32px;">ヴェルネルの法則</h2>
+  <p class="rule-desc">1875年にカール・ヴェルネルが発見した、グリムの法則の例外を説明する規則。グリムの法則通りに無声音になるはずの子音が、印欧祖語のアクセントの位置によって有声音になる場合がある。</p>
+
+  <div class="note" style="margin-bottom:16px;">
+    <strong style="color:var(--accent2);">規則の概要</strong><br>
+    グリムの法則では *p→f、*t→þ、*k→h になるはずだが、印欧祖語でその子音の直前の音節にアクセントがなかった場合、無声摩擦音ではなく有声音（f→v、þ→d、h→g/w）になった。つまりアクセントの位置が子音の変化先を決めていた。
+  </div>
+
+  <div class="rule-formula">アクセントなし：*t → þ（th）→ さらに d に有声化</div>
+
+  <table class="pair-table" style="margin-bottom:24px;">
+    <thead><tr><th>対応</th><th>単語</th><th>説明</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="td-latin" style="font-size:12px;white-space:nowrap;">f → v</td>
+        <td class="td-germanic">have / had<br>life / live<br>wolf / wolves<br>knife / knives</td>
+        <td class="td-meaning" style="font-size:13px;">語中・複数形など有声音に挟まれる位置で -f- が -v- に有声化。have の -v- と had の -d- は同じ語根から生まれた二形。life/live・wolf/wolves は単複や派生で f/v が交替する。</td>
+      </tr>
+      <tr>
+        <td class="td-latin" style="font-size:12px;white-space:nowrap;">þ → d（th → d）</td>
+        <td class="td-germanic">father（pater）<br>brother（frater）</td>
+        <td class="td-meaning" style="font-size:13px;">ラテン語 pater の -t- はグリムの法則では -þ-（th）になるはずだが、英語では father と -ð-（d音）になっている。印欧祖語でアクセントが第2音節（-tḗr）にあったためヴェルネルの法則が適用された。一方 brother（frāter）はアクセントが第1音節にあったため -þ-（th）が保持された。</td>
+      </tr>
+      <tr>
+        <td class="td-latin" style="font-size:12px;white-space:nowrap;">s → z → r<br>（ロータキズム）</td>
+        <td class="td-germanic">was / were<br>lose / forlorn</td>
+        <td class="td-meaning" style="font-size:13px;">ヴェルネルの法則で -s- が -z- に有声化し、さらに西ゲルマン語で -z- が -r- に変化（ロータキズム）。was はアクセント前の -s- が保持、were の -r- はアクセント後の -s- が z→r と変化した形。forlorn の -r- も同様。</td>
+      </tr>
+      <tr>
+        <td class="td-latin" style="font-size:12px;white-space:nowrap;">同語根の分化</td>
+        <td class="td-germanic">birth / burden<br>seethe / sodden</td>
+        <td class="td-meaning" style="font-size:13px;">同じ語根から、アクセント位置の違いで子音が異なる二形が生まれた。birth と burden は同語源だが -th- と -d- が交替。seethe（煮立つ）の過去分詞 sodden（びしょ濡れ）も -th-/-dd- の交替による。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="note">ヴェルネルの法則は比較言語学の歴史上重要な発見で、「例外のない音変化の法則は存在する」という青年文法学派の主張を支持する証拠となった。グリムの法則の「例外」に見えた現象が、実はより深い規則性を持っていたことを示した。</p>
+
+
+</section>
+
+<section>
+  <h2 id="sec-layers">英語の三層構造</h2>
+  <p class="rule-desc">英語の語彙は大きく三つの層に分かれる。古英語・ゲルマン語由来の日常語、1066年のノルマン征服後に流入したフランス語由来の中間層、そしてラテン・ギリシャ語由来の学術語。三層はそのまま格式の高さに対応しており、同じ概念でもニュアンスが異なる。</p>
+
+  <div class="note" style="margin-bottom:16px; border-left-color:var(--accent5);">
+    <strong style="color:var(--accent5);">なぜフランス語層が生まれたか</strong><br>
+    1066年のノルマン征服により、フランス語を話すノルマン人が支配層となった。以降約300年、法律・宮廷・教会の公用語はフランス語で、英語は庶民の言語にとどまった。この結果、支配・統治・文化に関わる語彙がフランス語から大量に流入し、ゲルマン系の日常語と並存することになった。
+  </div>
+
+  <h3>格式による三層対応</h3>
+  <p class="rule-desc" style="margin-bottom:10px;">左から右へ、日常的・親しみやすい → 礼儀正しい・フォーマル → 学術的・堅い、というニュアンスの変化がある。</p>
+  <table class="pair-table">
+    <thead><tr><th>ゲルマン系（日常）</th><th>フランス系（中間）</th><th>ラテン系（学術）</th><th>意味</th></tr></thead>
+    <tbody>
+      <tr><td class="td-germanic">ask</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);white-space:nowrap;">question</td><td class="td-latin">interrogate</td><td class="td-meaning">尋ねる</td></tr>
+      <tr><td class="td-germanic">kingly</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);white-space:nowrap;">royal</td><td class="td-latin">regal</td><td class="td-meaning">王の</td></tr>
+      <tr><td class="td-germanic">holy</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);white-space:nowrap;">sacred</td><td class="td-latin">consecrated</td><td class="td-meaning">神聖な</td></tr>
+      <tr><td class="td-germanic">begin</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);white-space:nowrap;">commence</td><td class="td-latin">initiate</td><td class="td-meaning">始める</td></tr>
+      <tr><td class="td-germanic">help</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);white-space:nowrap;">aid</td><td class="td-latin">assist</td><td class="td-meaning">助ける</td></tr>
+      <tr><td class="td-germanic">fire</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);white-space:nowrap;">flame</td><td class="td-latin">conflagration</td><td class="td-meaning">火</td></tr>
+    </tbody>
+  </table>
+
+  <h3>料理の語彙：育てる人と食べる人</h3>
+  <p class="rule-desc" style="margin-bottom:10px;">牛・豚・羊を育てるのはゲルマン系の農民で、食べるのはフランス語を話す貴族だった。生きた動物の名前はゲルマン系、調理後の肉の名前はフランス語由来という分裂が生じた。</p>
+  <table class="pair-table">
+    <thead><tr><th>動物（ゲルマン系）</th><th>肉料理（フランス系）</th></tr></thead>
+    <tbody>
+      <tr><td class="td-germanic">ox / cow</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);">beef（bœuf）</td></tr>
+      <tr><td class="td-germanic">pig</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);">pork（porc）</td></tr>
+      <tr><td class="td-germanic">sheep</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);">mutton（mouton）</td></tr>
+      <tr><td class="td-germanic">deer</td><td style="font-family:var(--mono);font-size:13px;color:var(--accent5);">venison（venaison）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2 id="sec-numerals">数詞の対応（1〜10）</h2>
+  <p class="rule-desc">印欧祖語の数詞が各言語でどのように変化したかを横断的に示す。グリムの法則による音変化（t→th, k→h など）が数詞にも規則的に現れている。</p>
+  <table class="pair-table">
+    <thead><tr><th>数</th><th>印欧祖語</th><th>ラテン語</th><th>ギリシャ語</th><th>英語（ゲルマン）</th></tr></thead>
+    <tbody>
+      <tr><td class="td-meaning">1</td><td class="td-pie">*oynos</td><td class="td-latin">unus</td><td class="td-greek">heis</td><td class="td-germanic">one</td></tr>
+      <tr><td class="td-meaning">2</td><td class="td-pie">*dwo</td><td class="td-latin">duo</td><td class="td-greek">duo</td><td class="td-germanic">two</td></tr>
+      <tr><td class="td-meaning">3</td><td class="td-pie">*treyes</td><td class="td-latin">tres</td><td class="td-greek">treis</td><td class="td-germanic">three</td></tr>
+      <tr><td class="td-meaning">4</td><td class="td-pie">*kwetwor</td><td class="td-latin">quattuor</td><td class="td-greek">tessares</td><td class="td-germanic">four</td></tr>
+      <tr><td class="td-meaning">5</td><td class="td-pie">*penkwe</td><td class="td-latin">quinque</td><td class="td-greek">pente</td><td class="td-germanic">five</td></tr>
+      <tr><td class="td-meaning">6</td><td class="td-pie">*sweks</td><td class="td-latin">sex</td><td class="td-greek">hex</td><td class="td-germanic">six</td></tr>
+      <tr><td class="td-meaning">7</td><td class="td-pie">*septm</td><td class="td-latin">septem</td><td class="td-greek">hepta</td><td class="td-germanic">seven</td></tr>
+      <tr><td class="td-meaning">8</td><td class="td-pie">*okto</td><td class="td-latin">octo</td><td class="td-greek">okto</td><td class="td-germanic">eight</td></tr>
+      <tr><td class="td-meaning">9</td><td class="td-pie">*newn</td><td class="td-latin">novem</td><td class="td-greek">ennea</td><td class="td-germanic">nine</td></tr>
+      <tr><td class="td-meaning">10</td><td class="td-pie">*dekm</td><td class="td-latin">decem</td><td class="td-greek">deka</td><td class="td-germanic">ten</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div>
+<script>
+  const title = document.getElementById('title');
+  title.addEventListener('click', () => {
+    const plain = title.querySelector('.plain');
+    const colored = title.querySelector('.colored');
+    if (colored.style.display === 'none') {
+      colored.style.display = 'inline';
+      plain.style.display = 'none';
+    } else {
+      colored.style.display = 'none';
+      plain.style.display = 'inline';
+    }
+  });
+
+  document.querySelectorAll('.grimm-table tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => tr.classList.toggle('expanded'));
+  });
+</script>
+</body>
+</html>
