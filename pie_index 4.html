@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIE形態素索引</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:wght@400;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0d0d; --surface: #141414; --surface2: #1c1c1c; --border: #2a2a2a;
+  --text: #e8e4dc; --muted: #7a7570;
+  --accent-pie: #6ec8c8; --accent-prefix: #c8a96e; --accent-root: #6e9fc8; --accent-suffix: #6ec88a;
+  --mono: 'DM Mono', monospace; --serif: 'Playfair Display', serif; --sans: 'Noto Sans JP', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--sans); font-weight:300; line-height:1.7; min-height:100vh; }
+
+header { padding:60px 60px 48px; border-bottom:1px solid var(--border); position:relative; overflow:hidden; }
+header::before { content:'PIE'; position:absolute; right:-10px; top:50%; transform:translateY(-50%); font-family:var(--serif); font-size:180px; font-weight:700; color:rgba(110,200,200,0.04); letter-spacing:-6px; pointer-events:none; }
+header h1 { font-family:var(--serif); font-size:42px; font-weight:700; color:var(--accent-pie); letter-spacing:-1px; margin-bottom:8px; }
+header p { font-family:var(--mono); font-size:12px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:24px; }
+.stats { display:flex; gap:32px; }
+.stat-num { font-family:var(--serif); font-size:28px; font-weight:700; color:var(--text); line-height:1; display:block; }
+.stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+
+.controls { display:none; }
+.ctrl-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.search-wrap { position:relative; flex:1; max-width:320px; min-width:160px; }
+#searchInput { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--mono); font-size:12px; padding:6px 28px 6px 10px; outline:none; transition:border-color 0.2s; }
+#searchInput:focus { border-color:var(--accent-pie); }
+#searchInput::placeholder { color:var(--muted); }
+#clearBtn { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; display:none; padding:2px 4px; }
+.ctrl-btns { display:flex; gap:4px; flex-wrap:wrap; }
+.cbtn { font-family:var(--mono); font-size:10px; letter-spacing:1px; padding:4px 10px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; border-radius:2px; transition:all 0.15s; white-space:nowrap; }
+.cbtn:hover { color:var(--text); border-color:var(--text); }
+.cbtn.active { background:var(--surface2); color:var(--text); border-color:var(--text); }
+.cbtn[data-f="prefix"].active { color:var(--accent-prefix); border-color:var(--accent-prefix); }
+.cbtn[data-f="root"].active { color:var(--accent-root); border-color:var(--accent-root); }
+.cbtn[data-f="suffix"].active { color:var(--accent-suffix); border-color:var(--accent-suffix); }
+.cbtn[data-m="orig"].active, .cbtn[data-m="examples"].active { color:var(--accent-pie); border-color:var(--accent-pie); }
+.hint { font-family:var(--mono); font-size:11px; color:var(--muted); margin-left:auto; }
+.ctrl-sep { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1px; white-space:nowrap; }
+
+main { max-width:1000px; margin:0 auto; padding:40px 60px 80px; }
+
+.root-item { border-bottom:1px solid rgba(42,42,42,0.6); }
+.root-header { display:flex; align-items:center; gap:14px; padding:14px 4px; cursor:pointer; user-select:none; border-radius:3px; transition:background 0.15s; }
+.root-header:hover { background:var(--surface); }
+.root-form { font-family:var(--mono); font-size:16px; font-weight:500; color:var(--accent-pie); min-width:140px; letter-spacing:0.03em; }
+.root-meaning { font-size:13px; color:var(--muted); flex:1; }
+.root-count { font-family:var(--mono); font-size:10px; color:var(--muted); padding:2px 8px; border:1px solid var(--border); border-radius:2px; white-space:nowrap; }
+.root-count.multi { color:var(--accent-pie); border-color:rgba(110,200,200,0.4); background:rgba(110,200,200,0.06); }
+.root-toggle { font-family:var(--mono); font-size:10px; color:var(--muted); transition:transform 0.2s; flex-shrink:0; }
+.root-item.open .root-toggle { transform:rotate(90deg); }
+.root-body { display:none; padding:4px 0 16px 20px; border-left:1px solid var(--border); margin-left:8px; margin-bottom:4px; }
+.root-item.open .root-body { display:flex; flex-direction:column; gap:8px; }
+
+.morpheme-card { background:var(--surface); border:1px solid var(--border); border-radius:3px; padding:12px 16px; display:grid; grid-template-columns:auto auto 1fr; gap:4px 12px; align-items:baseline; transition:border-color 0.15s; }
+.morpheme-card:hover { border-color:var(--muted); }
+.mc-form { font-family:var(--mono); font-size:14px; font-weight:500; grid-column:1; grid-row:1; }
+.mc-form.prefix { color:var(--accent-prefix); }
+.mc-form.root   { color:var(--accent-root); }
+.mc-form.suffix { color:var(--accent-suffix); }
+.mc-type { font-family:var(--mono); font-size:9px; letter-spacing:1px; padding:2px 6px; border-radius:2px; border:1px solid; white-space:nowrap; grid-column:2; grid-row:1; align-self:center; }
+.mc-type.prefix { color:var(--accent-prefix); border-color:rgba(200,169,110,0.4); background:rgba(200,169,110,0.06); }
+.mc-type.root   { color:var(--accent-root);   border-color:rgba(110,159,200,0.4); background:rgba(110,159,200,0.06); }
+.mc-type.suffix { color:var(--accent-suffix); border-color:rgba(110,200,138,0.4); background:rgba(110,200,138,0.06); }
+.mc-meaning { font-size:13px; color:var(--text); grid-column:3; grid-row:1; }
+.mc-pie { grid-column:1 / -1; font-family:var(--mono); font-size:11px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding-top:2px; }
+.pie-root { color:var(--muted); }
+.compound-current { color:var(--accent-pie); background:rgba(110,200,200,0.1); padding:1px 6px; border-radius:2px; border:1px solid rgba(110,200,200,0.35); }
+.compound-other { color:var(--accent-pie); opacity:0.5; padding:1px 6px; border-radius:2px; border:1px solid rgba(110,200,200,0.2); }
+.pie-plus { color:var(--muted); font-size:12px; }
+.mc-orig { grid-column:1 / -1; font-family:var(--mono); font-size:10px; color:var(--muted); padding-top:6px; border-top:1px solid var(--border); }
+.mc-ex { grid-column:1 / -1; font-size:12px; color:var(--muted); font-style:italic; }
+
+mark.hl { background:rgba(110,200,200,0.25); color:var(--accent-pie); border-radius:2px; padding:0 1px; }
+
+.child-group-wrap { display:flex; flex-direction:column; gap:0; border-left:2px solid rgba(110,200,200,0.2); margin-left:12px; }
+.root-child { border-bottom:1px solid rgba(42,42,42,0.6); overflow:hidden; }
+.root-child:last-child { border-bottom:none; }
+.root-child > .root-header { background:transparent; padding:10px 14px 10px 12px; }
+.root-child > .root-header .root-form { font-size:13px; color:rgba(110,200,200,0.75); }
+.root-child > .root-body { display:none !important; padding:4px 0 10px 16px; border-left:1px solid var(--border); margin-left:6px; margin-bottom:4px; }
+.root-child.open > .root-body { display:flex !important; flex-direction:column; gap:8px; }
+.root-parent-header { cursor:pointer; }
+
+/* タブ */
+.tab-bar { position:sticky; top:0; z-index:100; display:flex; border-bottom:1px solid var(--border); background:rgba(13,13,13,0.95); backdrop-filter:blur(10px); padding:0 20px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.tab-btn { font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:14px 20px; background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); cursor:pointer; margin-bottom:-1px; transition:all 0.2s; white-space:nowrap; flex-shrink:0; }
+.tab-btn.active { color:var(--accent-pie); border-bottom-color:var(--accent-pie); }
+.tab-btn:hover { color:var(--text); }
+
+/* ナビバー検索 */
+.nav-search-wrap { position:relative; margin-left:auto; display:flex; align-items:center; flex-shrink:0; padding:0 4px; }
+#searchInputTop { background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--mono); font-size:12px; padding:5px 24px 5px 10px; outline:none; width:90px; transition:border-color 0.2s, width 0.2s; }
+#searchInputTop:focus { border-color:var(--accent-pie); width:140px; }
+#searchInputTop::placeholder { color:var(--muted); }
+#clearBtnTop { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; display:none; padding:2px 4px; }
+#hintTop { font-family:var(--mono); font-size:10px; color:var(--muted); white-space:nowrap; padding:0 8px; }
+
+/* FAB */
+#fab { position:fixed; bottom:28px; right:20px; z-index:200; width:48px; height:48px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 16px rgba(0,0,0,0.5); transition:all 0.2s; }
+#fab:hover { border-color:var(--accent-pie); color:var(--accent-pie); }
+#fab.open { background:var(--accent-pie); color:#0d0d0d; border-color:var(--accent-pie); }
+#fabOverlay { position:fixed; inset:0; z-index:150; background:rgba(0,0,0,0.5); opacity:0; pointer-events:none; transition:opacity 0.25s; }
+#fabOverlay.show { opacity:1; pointer-events:all; }
+#fabSheet { position:fixed; bottom:0; left:0; right:0; z-index:160; background:var(--surface); border-top:1px solid var(--border); border-radius:16px 16px 0 0; padding:12px 20px 40px; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1); max-height:80vh; overflow-y:auto; }
+#fabSheet.show { transform:translateY(0); }
+.sheet-handle { width:36px; height:4px; border-radius:2px; background:var(--border); margin:0 auto 16px; }
+.sheet-section { margin-bottom:18px; }
+.sheet-label { font-size:10px; letter-spacing:2px; color:var(--muted); font-family:var(--mono); margin-bottom:8px; text-transform:uppercase; }
+.sheet-row { display:flex; gap:8px; flex-wrap:wrap; }
+.s-btn { font-family:var(--mono); font-size:11px; letter-spacing:1px; padding:6px 16px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; border-radius:2px; transition:all 0.15s; }
+.s-btn:hover { border-color:var(--text); color:var(--text); }
+.s-btn.active { background:var(--accent-pie); color:#0d0d0d; border-color:var(--accent-pie); }
+
+/* グループビュー */
+#groupView { max-width:1000px; margin:0 auto; padding:40px 60px 80px; display:none; }
+@media (max-width:768px) { #groupView { padding:24px 20px 60px; } }
+.group-card { border:1px solid var(--border); border-radius:4px; overflow:hidden; margin-bottom:12px; }
+.group-header { padding:14px 18px; display:flex; align-items:center; gap:12px; cursor:pointer; user-select:none; background:var(--surface); transition:background 0.15s; }
+.group-header:hover { background:var(--surface2); }
+.group-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.group-name { font-size:14px; font-weight:500; flex:1; }
+.group-en { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1px; }
+.group-toggle { font-family:var(--mono); font-size:10px; color:var(--muted); transition:transform 0.2s; flex-shrink:0; }
+.group-card.open .group-toggle { transform:rotate(90deg); }
+.group-body { display:none; border-top:1px solid var(--border); padding:14px 18px; }
+.group-card.open .group-body { display:block; }
+.g-entries { display:flex; flex-direction:column; gap:6px; }
+.g-entry { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:8px 12px; background:var(--surface2); border-radius:3px; border:1px solid transparent; transition:border-color 0.15s; }
+.g-entry:hover { border-color:var(--border); }
+.g-entry.search-match { border-color:rgba(110,200,200,0.4); background:rgba(110,200,200,0.05); }
+.g-pie { font-family:var(--mono); font-size:12px; color:var(--accent-pie); min-width:140px; }
+.g-forms { display:flex; gap:5px; flex-wrap:wrap; }
+.g-form-tag { font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:2px; border:1px solid; white-space:nowrap; }
+.g-form-tag.prefix { color:var(--accent-prefix); border-color:rgba(200,169,110,0.4); background:rgba(200,169,110,0.06); }
+.g-form-tag.root   { color:var(--accent-root);   border-color:rgba(110,159,200,0.4); background:rgba(110,159,200,0.06); }
+.g-form-tag.suffix { color:var(--accent-suffix); border-color:rgba(110,200,138,0.4); background:rgba(110,200,138,0.06); }
+.g-multi { font-family:var(--mono); font-size:9px; padding:1px 5px; border-radius:2px; border:1px solid rgba(110,200,200,0.4); background:rgba(110,200,200,0.08); color:var(--accent-pie); white-space:nowrap; align-self:center; }
+.g-note { font-size:11px; color:var(--muted); width:100%; margin-top:2px; }
+mark.hl { background:rgba(110,200,200,0.25); color:var(--accent-pie); border-radius:2px; padding:0 1px; }
+
+
+footer { border-top:1px solid var(--border); padding:24px 60px; font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:1px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+
+@media (max-width:768px) {
+  header, main, footer, .controls { padding-left:20px; padding-right:20px; }
+  header h1 { font-size:28px; }
+  .root-form { min-width:100px; font-size:14px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PIE形態素索引</h1>
+  <p>Proto-Indo-European Morpheme Index</p>
+  <div class="stats">
+    <div><span class="stat-num" id="statRoots">—</span><span class="stat-label">PIE語根</span></div>
+    <div><span class="stat-num" id="statEntries">—</span><span class="stat-label">形態素</span></div>
+    <div><span class="stat-num" id="statMulti">—</span><span class="stat-label">複数対応</span></div>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="roots">語根順</button>
+  <button class="tab-btn" data-tab="groups">機能グループ</button>
+  <div class="nav-search-wrap">
+    <input id="searchInputTop" type="text" placeholder="検索…" autocomplete="off" spellcheck="false">
+    <button id="clearBtnTop">✕</button>
+  </div>
+  <span id="hintTop"></span>
+</div>
+
+<!-- FAB -->
+<button id="fab" aria-label="メニュー">
+  <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><rect width="16" height="1.5" rx="0.75" fill="currentColor"/><rect y="5.25" width="16" height="1.5" rx="0.75" fill="currentColor"/><rect y="10.5" width="16" height="1.5" rx="0.75" fill="currentColor"/></svg>
+</button>
+<div id="fabOverlay"></div>
+<div id="fabSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-section">
+    <div class="sheet-label">検索対象</div>
+    <div class="sheet-row" id="modeBtns">
+      <button class="cbtn active" data-m="form">形態素</button>
+      <button class="cbtn active" data-m="meaning">意味</button>
+      <button class="cbtn active" data-m="pie">PIE語根</button>
+      <button class="cbtn" data-m="orig">語源</button>
+      <button class="cbtn" data-m="examples">例語</button>
+    </div>
+  </div>
+  <div class="sheet-section">
+    <div class="sheet-label">絞り込み</div>
+    <div class="sheet-row" id="filterBtns">
+      <button class="cbtn active" data-f="all">すべて</button>
+      <button class="cbtn" data-f="multi">複数対応</button>
+      <button class="cbtn" data-f="compound">複合</button>
+      <button class="cbtn" data-f="prefix">接頭辞</button>
+      <button class="cbtn" data-f="root">語根</button>
+      <button class="cbtn" data-f="suffix">接尾辞</button>
+    </div>
+  </div>
+</div>
+
+<main id="main"></main>
+<div id="groupView"></div>
+
+<footer>
+  <span>PIE Morpheme Index — english_morphology より自動生成</span>
+  <span>印欧祖語の再建形はすべて仮説に基づく</span>
+</footer>
+
+<script>
+const DATA = [{"root": "*-dʰlo-", "entries": [{"pie": "*-tlo-/*-dʰlo-（道具・手段）", "pie_roots": ["*-tlo-", "*-dʰlo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-acle", "meaning": "小さいもの・具体物", "orig": "ラテン -aculum / -iculum", "examples": "spectacle, obstacle, particle, article"}, {"pie": "*-dʰlo-/*-tlo-（可能・手段）", "pie_roots": ["*-dʰlo-", "*-tlo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-able", "meaning": "〜できる・〜に値する", "orig": "ラテン -abilis / -ibilis（→フランス）", "examples": "readable, possible, comfortable, visible, flexible"}], "parent": null}, {"root": "*-eh₂", "entries": [{"pie": "*-eh₂（女性名詞語尾）", "pie_roots": ["*-eh₂"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-a", "meaning": "ラテン語女性名詞主格語尾・中性複数語尾", "orig": "ラテン語第1変化名詞主格 -a / 中性複数 -a", "examples": "antenna, formula, agenda, data（複数）, criteria（複数）"}, {"pie": "*-eh₂ + *-es（女性複数語尾）", "pie_roots": ["*-eh₂", "*-es"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ae", "meaning": "ラテン語女性名詞複数語尾", "orig": "ラテン語第1変化名詞複数 -ae", "examples": "alumnae, formulae, antennae, vertebrae"}], "parent": null}, {"root": "*-er", "entries": [{"pie": "*úper（上に・越えて）← *úp + 局所副詞形成接尾辞 *-er", "pie_roots": ["*úper", "*-er"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "super-", "meaning": "上・超えて", "orig": "ラテン super（→古仏 sur-）", "examples": "superhuman, supervise, surface, surpass"}], "parent": null}, {"root": "*-ere-", "entries": [{"pie": "*-ere-（動作主接尾辞）", "pie_roots": ["*-ere-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-er", "meaning": "〜する人・道具", "orig": "古英語 -ere（ゲルマン語系）", "examples": "teacher, writer, runner, driver, farmer"}], "parent": null}, {"root": "*-es", "entries": [{"pie": "*-eh₂ + *-es（女性複数語尾）", "pie_roots": ["*-eh₂", "*-es"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ae", "meaning": "ラテン語女性名詞複数語尾", "orig": "ラテン語第1変化名詞複数 -ae", "examples": "alumnae, formulae, antennae, vertebrae"}], "parent": null}, {"root": "*-id-", "entries": [{"pie": "*-wo- + *-id-（形・様相）", "pie_roots": ["*-wo-", "*-id-"], "is_compound": true, "origin": "ギリシャ", "type": "suffix", "form": "-oid", "meaning": "〜に似た・〜の性質を持つ", "orig": "ギリシャ -oeides", "examples": "monoid, groupoid, toroid, humanoid, asteroid"}], "parent": null}, {"root": "*-idyé-", "entries": [{"pie": "*-idyé-（〜にする）+ *-mo-（〜の結果・産物）", "pie_roots": ["*-idyé-", "*-mo-"], "is_compound": true, "origin": "ギリシャ", "type": "suffix", "form": "-ism", "meaning": "主義・思想・行動様式", "orig": "ギリシャ -ismos", "examples": "capitalism, racism, criticism, realism, journalism"}, {"pie": "*-idyé-（動詞化）+ *-to-（動作主）", "pie_roots": ["*-idyé-", "*-to-"], "is_compound": true, "origin": "ギリシャ", "type": "suffix", "form": "-ist", "meaning": "〜主義者・専門家", "orig": "ギリシャ -istes", "examples": "scientist, pianist, optimist, journalist, terrorist"}, {"pie": "*-idyé-（動詞化）", "pie_roots": ["*-idyé-"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-ize", "meaning": "〜化する・〜にする", "orig": "ギリシャ -izein", "examples": "organize, realize, modernize, digitize, criticize"}], "parent": null}, {"root": "*-ih₂-", "entries": [{"pie": "*-nt-（現在分詞）+ *-ih₂-（名詞化）", "pie_roots": ["*-nt-", "*-ih₂-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ance", "meaning": "行為・状態・性質", "orig": "ラテン -antia / -entia（→フランス）", "examples": "performance, existence, evidence, distance"}, {"pie": "*-ih₂-（抽象名詞化）", "pie_roots": ["*-ih₂-"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-ia", "meaning": "状態・概念・行為（名詞化）", "orig": "ギリシャ/ラテン -ia（→ 英語化で -y）", "examples": "amnesia, insomnia, utopia, biology, victory, morphology"}], "parent": null}, {"root": "*-is", "entries": [{"pie": "*-is（第3変化名詞語尾）", "pie_roots": ["*-is"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-is", "meaning": "ギリシャ語・ラテン語名詞語尾", "orig": "ギリシャ語 -is / ラテン語第3変化 -is", "examples": "basis, axis, crisis, thesis, analysis, hypothesis"}], "parent": null}, {"root": "*-isko-", "entries": [{"pie": "*-isko-（〜に属する・〜のような：形容詞化接尾辞）", "pie_roots": ["*-isko-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ish", "meaning": "〜らしい・やや〜", "orig": "古英語 -isc", "examples": "childish, reddish, foolish, selfish, Spanish"}], "parent": null}, {"root": "*-ko-", "entries": [{"pie": "*-ko-（〜に属する）の複数形", "pie_roots": ["*-ko-"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-ics", "meaning": "学問・技術体系", "orig": "ギリシャ -ika", "examples": "mathematics, physics, economics, athletics"}, {"pie": "*-ko-（形容詞化）", "pie_roots": ["*-ko-"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-ic", "meaning": "〜の・〜に関する", "orig": "ギリシャ -ikos（-ical は -ic + -al の重複形）", "examples": "historic, economic, atomic, musical, logical, historical"}, {"pie": "*-ko-（形容詞化）", "pie_roots": ["*-ko-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-y", "meaning": "〜の性質を持つ・〜が多い（形容詞化）", "orig": "古英語 -ig", "examples": "cloudy, rainy, happy, lucky, dirty, tricky"}], "parent": null}, {"root": "*-linga-", "entries": [{"pie": "*-lo-（道具・性質接尾辞 → プロト・ゲルマン語 *-linga-）", "pie_roots": ["*-lo-", "*-linga-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ling", "meaning": "小さい・若い・〜に属する", "orig": "古英語 -ling", "examples": "duckling, yearling, underling, hireling"}], "parent": null}, {"root": "*-lo-", "entries": [{"pie": "*-lo-（指小辞：小さい）", "pie_roots": ["*-lo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-al", "meaning": "行為・過程（名詞として）", "orig": "ラテン -alis", "examples": "arrival, removal, proposal, denial, trial"}, {"pie": "*-lo-（道具・手段）", "pie_roots": ["*-lo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ule", "meaning": "小さいもの（指小辞）", "orig": "ラテン -ulus / -culus", "examples": "capsule, module, molecule, granule"}, {"pie": "*-lo-（関係・場所）", "pie_roots": ["*-lo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ary", "meaning": "場所・集合・関係", "orig": "ラテン -arius / -orius", "examples": "library, bakery, laboratory, dormitory"}, {"pie": "*-lo-（指小辞：小さい）", "pie_roots": ["*-lo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-al", "meaning": "〜に関する", "orig": "ラテン -alis", "examples": "national, financial, musical, emotional, historical, logical"}, {"pie": "*-lo-（関係・場所）", "pie_roots": ["*-lo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ary", "meaning": "〜に関する・〜の場所", "orig": "ラテン -arius / -orius", "examples": "primary, military, laboratory, dormitory"}, {"pie": "*-lo-（PIE道具・性質接尾辞 → プロト・ゲルマン語 *-linga-）", "pie_roots": ["*-lo-", "*-linga-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ling", "meaning": "小さい・若い・〜に属する", "orig": "古英語 -ling", "examples": "duckling, yearling, underling, hireling"}], "parent": null}, {"root": "*-mo-", "entries": [{"pie": "*-idyé-（〜にする）+ *-mo-（〜の結果・産物）", "pie_roots": ["*-idyé-", "*-mo-"], "is_compound": true, "origin": "ギリシャ", "type": "suffix", "form": "-ism", "meaning": "主義・思想・行動様式", "orig": "ギリシャ -ismos", "examples": "capitalism, racism, criticism, realism, journalism"}], "parent": null}, {"root": "*-no-", "entries": [{"pie": "*-no-（所属・関係）", "pie_roots": ["*-no-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ian", "meaning": "〜の人・〜に属する人", "orig": "ラテン -ianus / -anus", "examples": "musician, politician, historian, librarian"}, {"pie": "*-no-（形容詞化）", "pie_roots": ["*-no-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-en", "meaning": "〜でできた・〜の性質", "orig": "古英語 -nian", "examples": "golden, wooden, silken, frozen, broken"}, {"pie": "*-no-（形容詞化）", "pie_roots": ["*-no-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-en", "meaning": "〜にする・〜になる", "orig": "古英語 -nian", "examples": "strengthen, widen, shorten, brighten, deepen"}], "parent": null}, {"root": "*-nt-", "entries": [{"pie": "*-nt-（現在分詞）+ *-ih₂-（名詞化）", "pie_roots": ["*-nt-", "*-ih₂-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ance", "meaning": "行為・状態・性質", "orig": "ラテン -antia / -entia（→フランス）", "examples": "performance, existence, evidence, distance"}], "parent": null}, {"root": "*-o-", "entries": [{"pie": "*-o- + *-s-（o茎形容詞化）", "pie_roots": ["*-o-", "*-s-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ous", "meaning": "〜の性質・〜に富む", "orig": "ラテン -osus（→古仏）", "examples": "dangerous, curious, gorgeous, courageous"}], "parent": null}, {"root": "*-oi", "entries": [{"pie": "*-oi（男性複数語尾）", "pie_roots": ["*-oi"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-i", "meaning": "ラテン語男性名詞複数語尾", "orig": "ラテン語第2変化名詞複数 -i", "examples": "alumni, cacti, radii, stimuli, nuclei"}], "parent": null}, {"root": "*-om", "entries": [{"pie": "*-om（中性名詞語尾）", "pie_roots": ["*-om"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-um", "meaning": "ラテン語中性名詞語尾（場所・物・概念）", "orig": "ラテン -um（中性第二変化語尾）", "examples": "museum, aquarium, stadium, medium, spectrum"}], "parent": null}, {"root": "*-on-", "entries": [{"pie": "*-ti- + *-on-（行為名詞化 + n茎）", "pie_roots": ["*-ti-", "*-on-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ion", "meaning": "行為・状態・結果", "orig": "ラテン -tionem / -sionem", "examples": "education, decision, action, tension, vision"}], "parent": null}, {"root": "*-os", "entries": [{"pie": "*-os（男性名詞語尾）", "pie_roots": ["*-os"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-us", "meaning": "ラテン語男性名詞主格語尾", "orig": "ラテン語第2変化名詞主格 -us", "examples": "campus, radius, virus, status, focus, nucleus"}], "parent": null}, {"root": "*-s-", "entries": [{"pie": "*-o- + *-s-（o茎形容詞化）", "pie_roots": ["*-o-", "*-s-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ous", "meaning": "〜の性質・〜に富む", "orig": "ラテン -osus（→古仏）", "examples": "dangerous, curious, gorgeous, courageous"}], "parent": null}, {"root": "*-teh₂-", "entries": [{"pie": "*-teh₂-（〜の状態・性質）", "pie_roots": ["*-teh₂-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ity", "meaning": "性質・状態・程度", "orig": "ラテン -itas", "examples": "creativity, liberty, reality, equality, safety"}, {"pie": "*-teh₂- + *-yeh₂-（〜の状態）", "pie_roots": ["*-teh₂-", "*-yeh₂-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-cy", "meaning": "状態・性質・役職", "orig": "ラテン -cia / ギリシャ -kia（→フランス -cie）", "examples": "privacy, accuracy, infancy, presidency, fluency, urgency, literacy"}], "parent": null}, {"root": "*-teros", "entries": [{"pie": "*kom-（共に）+ *-teros（対照接尾辞）+ 奪格語尾", "pie_roots": ["*kom-", "*-teros"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "contra-", "meaning": "反対・逆", "orig": "ラテン contra", "examples": "contradict, contraband, contrast"}, {"pie": "*egʰs（外へ）+ *-teros（対照接尾辞）→ 奪格形 extra", "pie_roots": ["*egʰs", "*-teros"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "extra-", "meaning": "外に・超えて", "orig": "ラテン extra ← exterus（外の）の奪格形", "examples": "extraordinary, extraterrestrial, extrovert"}, {"pie": "*sem-（同じ）の零グレード + *-teros → ギリシャ語 heteros", "pie_roots": ["*sem-", "*-teros"], "is_compound": true, "origin": "ギリシャ", "type": "prefix", "form": "hetero-", "meaning": "異なる・別の", "orig": "ギリシャ heteros（他の）", "examples": "heterogeneous, heterodox, heterosexual, heteronym"}], "parent": null}, {"root": "*-ti-", "entries": [{"pie": "*-ti- + *-on-（行為名詞化 + n茎）", "pie_roots": ["*-ti-", "*-on-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ion", "meaning": "行為・状態・結果", "orig": "ラテン -tionem / -sionem", "examples": "education, decision, action, tension, vision"}], "parent": null}, {"root": "*-tiko-", "entries": [{"pie": "*-tiko-（ラテン語内で発達）", "pie_roots": ["*-tiko-"], "is_compound": false, "origin": "フランス", "type": "suffix", "form": "-age", "meaning": "行為・集合・状態", "orig": "ラテン -aticum（→フランス -age）", "examples": "language, marriage, storage, passage, damage"}], "parent": null}, {"root": "*-tlo-", "entries": [{"pie": "*-tlo-/*-dʰlo-（道具・手段）", "pie_roots": ["*-tlo-", "*-dʰlo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-acle", "meaning": "小さいもの・具体物", "orig": "ラテン -aculum / -iculum", "examples": "spectacle, obstacle, particle, article"}, {"pie": "*-dʰlo-/*-tlo-（可能・手段）", "pie_roots": ["*-dʰlo-", "*-tlo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-able", "meaning": "〜できる・〜に値する", "orig": "ラテン -abilis / -ibilis（→フランス）", "examples": "readable, possible, comfortable, visible, flexible"}], "parent": null}, {"root": "*-to-", "entries": [{"pie": "*men-（考える）+ *-to-（形容詞化接尾辞）", "pie_roots": ["*men-", "*-to-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ment", "meaning": "行為・結果・手段", "orig": "ラテン -mentum（→フランス）", "examples": "movement, government, treatment, argument"}, {"pie": "*-idyé-（動詞化）+ *-to-（動作主）", "pie_roots": ["*-idyé-", "*-to-"], "is_compound": true, "origin": "ギリシャ", "type": "suffix", "form": "-ist", "meaning": "〜主義者・専門家", "orig": "ギリシャ -istes", "examples": "scientist, pianist, optimist, journalist, terrorist"}, {"pie": "*-to-（過去分詞化）", "pie_roots": ["*-to-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ate", "meaning": "〜する・〜の状態にする", "orig": "ラテン -atus", "examples": "create, operate, communicate, motivate, generate"}], "parent": null}, {"root": "*-tu-", "entries": [{"pie": "*-tu-（行為・結果名詞化）", "pie_roots": ["*-tu-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ure", "meaning": "行為・結果・状態", "orig": "ラテン -ura（→フランス）", "examples": "structure, failure, pressure, mixture, nature"}], "parent": null}, {"root": "*-tōr", "entries": [{"pie": "*-tōr（動作主）", "pie_roots": ["*-tōr"], "is_compound": false, "origin": "フランス", "type": "suffix", "form": "-eur", "meaning": "〜する人（フランス語借用）", "orig": "フランス -eur（男性）/ -euse（女性）← ラテン -ator", "examples": "entrepreneur, chauffeur, masseur / masseuse, danseuse"}], "parent": null}, {"root": "*-wo-", "entries": [{"pie": "*-wo-（〜の状態にある）", "pie_roots": ["*-wo-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ive", "meaning": "〜の傾向がある・〜的な", "orig": "ラテン -ivus（-ative は -atus + -ivus）", "examples": "active, creative, sensitive, negative, imaginative, collaborative"}, {"pie": "*-wo- + *-id-（形・様相）", "pie_roots": ["*-wo-", "*-id-"], "is_compound": true, "origin": "ギリシャ", "type": "suffix", "form": "-oid", "meaning": "〜に似た・〜の性質を持つ", "orig": "ギリシャ -oeides", "examples": "monoid, groupoid, toroid, humanoid, asteroid"}], "parent": null}, {"root": "*-yeh₂-", "entries": [{"pie": "*-teh₂- + *-yeh₂-（〜の状態）", "pie_roots": ["*-teh₂-", "*-yeh₂-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-cy", "meaning": "状態・性質・役職", "orig": "ラテン -cia / ギリシャ -kia（→フランス -cie）", "examples": "privacy, accuracy, infancy, presidency, fluency, urgency, literacy"}], "parent": null}, {"root": "*-ōs", "entries": [{"pie": "*-ōs/-es（状態・性質名詞）", "pie_roots": ["*-ōs"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-or", "meaning": "状態・性質（名詞化）", "orig": "ラテン -or（状態・性質名詞語尾）", "examples": "color, error, horror, honor, humor, terror, valor"}], "parent": null}, {"root": "*al-", "entries": [{"pie": "*alnaz（全て）← PIE *al-（超えて・全体）", "pie_roots": ["*alnaz", "*al-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "al-", "meaning": "すべて・完全に（all の弱形）※歴史的形態素・現代では非生産的", "orig": "古英語 eall（all）の弱形", "examples": "always, already, almost, also, altogether, albeit, alone"}, {"pie": "*al-（超えて）→ ラテン語 ultra（奪格形）", "pie_roots": ["*al-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ultra-", "meaning": "極端に超えて・〜を超えた", "orig": "ラテン ultra（向こうに・超えて）← ulter の奪格形", "examples": "ultraviolet, ultrasound, ultramodern, ultraconservative"}], "parent": null}, {"root": "*alnaz", "entries": [{"pie": "*alnaz（全て）← PIE *al-（超えて・全体）", "pie_roots": ["*alnaz", "*al-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "al-", "meaning": "すべて・完全に（all の弱形）※歴史的形態素・現代では非生産的", "orig": "古英語 eall（all）の弱形", "examples": "always, already, almost, also, altogether, albeit, alone"}], "parent": "*al-"}, {"root": "*amma-", "entries": [{"pie": "*amma-（母・愛）（諸説あり）", "pie_roots": ["*amma-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "am-", "meaning": "愛する", "orig": "ラテン amare", "examples": "amour, amateur, amicable, enamored"}], "parent": null}, {"root": "*apo", "entries": [{"pie": "*apo（後に・離れて）← ラテン語内で発達", "pie_roots": ["*apo"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "post-", "meaning": "後に", "orig": "ラテン post", "examples": "postwar, postpone, postmodern, postgraduate"}, {"pie": "*apo（離れて）+ *sinere（置く）→ *po-sinere", "pie_roots": ["*apo", "*sinere"], "is_compound": true, "origin": "ラテン", "type": "root", "form": "pon-", "meaning": "置く", "orig": "ラテン ponere", "examples": "compose, position, deposit, opponent, postpone"}], "parent": null}, {"root": "*bʰegʷ-", "entries": [{"pie": "*bʰegʷ-（逃げる・恐れる）", "pie_roots": ["*bʰegʷ-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "phob-", "meaning": "恐れ・嫌悪", "orig": "ギリシャ phobos（恐れ）", "examples": "phobia, xenophobia, arachnophobia, xenophobe, homophobic"}], "parent": null}, {"root": "*bʰeh₂-", "entries": [{"pie": "*bʰeh₂-（話す・輝く）", "pie_roots": ["*bʰeh₂-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "phon", "meaning": "音・声", "orig": "ギリシャ phone", "examples": "phone, phonetic, symphony, microphone, euphony"}, {"pie": "*bʰeh₂-（輝く・光）", "pie_roots": ["*bʰeh₂-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "phot-", "meaning": "光", "orig": "ギリシャ phōs/phōtos（photo- は phot- + 連結母音 -o-）", "examples": "photograph, photosynthesis, photon, photoelectric"}], "parent": null}, {"root": "*bʰeidʰ-", "entries": [{"pie": "*bʰeidʰ-（信頼する・従う）", "pie_roots": ["*bʰeidʰ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "fid", "meaning": "信頼・信仰", "orig": "ラテン fides", "examples": "confide, confidence, fidelity, infidel"}], "parent": null}, {"root": "*bʰendʰ-", "entries": [{"pie": "*bʰendʰ-（縛る）", "pie_roots": ["*bʰendʰ-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-bound", "meaning": "〜に縛られた・制約された半接尾辞", "orig": "古英語 bindan", "examples": "snowbound, housebound, duty-bound, spellbound"}], "parent": null}, {"root": "*bʰer-", "entries": [{"pie": "*bʰer-（運ぶ・持つ）", "pie_roots": ["*bʰer-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "fer", "meaning": "運ぶ・持つ", "orig": "ラテン ferre", "examples": "transfer, offer, refer, prefer, fertile"}, {"pie": "*bʰer-（運ぶ）", "pie_roots": ["*bʰer-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-iferous", "meaning": "〜を持つ・産する", "orig": "ラテン -ifer（ferre）", "examples": "coniferous, pestiferous, somniferous"}], "parent": null}, {"root": "*bʰes-", "entries": [{"pie": "*bʰes-（吹く・息をする）← *psyche（息・魂）", "pie_roots": ["*bʰes-", "*psyche"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "psych", "meaning": "心・精神", "orig": "ギリシャ psyche", "examples": "psychology, psychiatry, psychic, psychopath"}], "parent": "*psyche"}, {"root": "*bʰew-", "entries": [{"pie": "*bʰew-（存在する・向かう）→ 古ノルド語 būa", "pie_roots": ["*bʰew-"], "is_compound": false, "origin": "その他", "type": "suffix", "form": "-bound", "meaning": "〜行きの・〜に向かう半接尾辞", "orig": "古ノルド語 būa", "examples": "northbound, eastbound, homebound, outbound"}], "parent": null}, {"root": "*bʰewg-", "entries": [{"pie": "*bʰewg-（享受する・機能する）", "pie_roots": ["*bʰewg-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "funct", "meaning": "働き・機能", "orig": "ラテン functio", "examples": "function, functor, functional"}], "parent": null}, {"root": "*bʰil-", "entries": [{"pie": "*bʰil-（愛する・好む）（諸説あり）", "pie_roots": ["*bʰil-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "phil", "meaning": "愛する・好む", "orig": "ギリシャ philos", "examples": "philosophy, philanthropy, bibliophile, hydrophilic, Anglophile"}], "parent": null}, {"root": "*bʰleu-", "entries": [{"pie": "*bʰleu-（流れる・噴き出す）", "pie_roots": ["*bʰleu-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "flu-", "meaning": "流れる", "orig": "ラテン fluere", "examples": "fluid, influence, flux, affluent"}], "parent": null}, {"root": "*bʰreg-", "entries": [{"pie": "*bʰreg-（壊す・折る）", "pie_roots": ["*bʰreg-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "frag-", "meaning": "壊す・折る", "orig": "ラテン frangere", "examples": "fracture, fragment, fraction, fragile, refract"}], "parent": null}, {"root": "*bʰuH-", "entries": [{"pie": "*bʰuH-（存在する・成長する）", "pie_roots": ["*bʰuH-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "phyt-", "meaning": "植物・成長", "orig": "ギリシャ phyton（植物・育ったもの）", "examples": "phytoplankton, epiphyte, neophyte, phytochemical"}, {"pie": "*bʰuH-（存在する・成長する）", "pie_roots": ["*bʰuH-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "phys", "meaning": "自然・物質・身体", "orig": "ギリシャ physis", "examples": "physics, physical, physician, metaphysics, physiology"}, {"pie": "*preyH-（好む・愛する）または *pro- + *bʰuH-（諸説あり）", "pie_roots": ["*preyH-", "*bʰuH-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-proof", "meaning": "〜を通さない・〜に耐える半接尾辞", "orig": "ラテン probare（→古仏 prove →古英語 prof）", "examples": "waterproof, bulletproof, fireproof, foolproof, soundproof"}], "parent": null}, {"root": "*de-", "entries": [{"pie": "*de-（下へ・離れて）← PIE不明、ラテン語固有", "pie_roots": ["*de-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "de-", "meaning": "除去・逆・下へ", "orig": "ラテン de", "examples": "decode, decompose, decrease, defrost"}], "parent": null}, {"root": "*deh₂-", "entries": [{"pie": "*deh₂-（分ける・民）", "pie_roots": ["*deh₂-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "dem-", "meaning": "人々", "orig": "ギリシャ demos（demo- は dem- + 連結母音 -o-）", "examples": "democracy, demographic, epidemic, endemic"}], "parent": null}, {"root": "*deik-", "entries": [{"pie": "*deik-（示す・指す）", "pie_roots": ["*deik-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "dict", "meaning": "言う・宣言する", "orig": "ラテン dicere", "examples": "dictionary, predict, dictate, contradict, verdict"}, {"pie": "*deik-（示す・指す）← 指で示すもの", "pie_roots": ["*deik-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "digit", "meaning": "指・数字", "orig": "ラテン digitus", "examples": "digital, digit, digitize, fingertip"}], "parent": null}, {"root": "*del-", "entries": [{"pie": "*del-（引き裂く・苦しめる）", "pie_roots": ["*del-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "dol-", "meaning": "悲しみ・痛み", "orig": "ラテン dolor", "examples": "dolor, dolorous, doleful, condolence"}], "parent": null}, {"root": "*dem-", "entries": [{"pie": "*dem-（家・建てる）", "pie_roots": ["*dem-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "dom", "meaning": "家・支配", "orig": "ラテン domus", "examples": "domestic, dominant, dominate, domain"}], "parent": null}, {"root": "*der-", "entries": [{"pie": "*der-（剥ぐ・裂く）", "pie_roots": ["*der-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "derm-", "meaning": "皮膚", "orig": "ギリシャ derma（皮膚）", "examples": "dermatology, epidermis, hypodermic, pachyderm"}], "parent": null}, {"root": "*deuk-", "entries": [{"pie": "*deuk-（導く・引く）", "pie_roots": ["*deuk-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "duc-", "meaning": "導く・引く", "orig": "ラテン ducere", "examples": "conduct, educate, produce, reduce, aqueduct"}], "parent": null}, {"root": "*deḱm", "entries": [{"pie": "*deḱm（十）→ ラテン語 decem", "pie_roots": ["*deḱm"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "dec-", "meaning": "10", "orig": "ラテン decem", "examples": "decade, decimal, decimate"}, {"pie": "*deḱm（十）→ ギリシャ語 deka", "pie_roots": ["*deḱm"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "deca-", "meaning": "10", "orig": "ギリシャ deka", "examples": "decathlon, decagon, decameter"}], "parent": null}, {"root": "*dngʰu-", "entries": [{"pie": "*dn̥ghwéh₂-（舌）← *dngʰu-", "pie_roots": ["*dn̥ghwéh₂-", "*dngʰu-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ling", "meaning": "言語・舌", "orig": "ラテン lingua", "examples": "linguistics, bilingual, language, multilingual"}], "parent": null}, {"root": "*dn̥ghwéh₂-", "entries": [{"pie": "*dn̥ghwéh₂-（舌）← *dngʰu-", "pie_roots": ["*dn̥ghwéh₂-", "*dngʰu-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ling", "meaning": "言語・舌", "orig": "ラテン lingua", "examples": "linguistics, bilingual, language, multilingual"}], "parent": "*dngʰu-"}, {"root": "*dus-", "entries": [{"pie": "*dus-（悪い）→ ギリシャ語 dys", "pie_roots": ["*dus-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "dys-", "meaning": "悪い・不全", "orig": "ギリシャ dys", "examples": "dysfunction, dyslexia, dystopia"}], "parent": null}, {"root": "*dwi-", "entries": [{"pie": "*dwi-（二つ）← *dwo", "pie_roots": ["*dwi-", "*dwo"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "bi-", "meaning": "2つ", "orig": "ラテン bis / bini", "examples": "bicycle, bilingual, binary, biannual"}, {"pie": "*dwi-（二つ）← *dwo → ギリシャ語 dis", "pie_roots": ["*dwi-", "*dwo"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "di-", "meaning": "2つ", "orig": "ギリシャ dis", "examples": "dioxide, dilemma, dipole, diphthong"}], "parent": "*dwo"}, {"root": "*dwis-", "entries": [{"pie": "*dwis-（二つに・分離）← *dwo（2）", "pie_roots": ["*dwis-", "*dwo"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "dis-", "meaning": "否定・分離・除去", "orig": "ラテン dis-", "examples": "disagree, disconnect, disappear, disorder"}], "parent": "*dwo"}, {"root": "*dwo", "entries": [{"pie": "*dwis-（二つに・分離）← *dwo（2）", "pie_roots": ["*dwis-", "*dwo"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "dis-", "meaning": "否定・分離・除去", "orig": "ラテン dis-", "examples": "disagree, disconnect, disappear, disorder"}, {"pie": "*dwi-（二つ）← *dwo", "pie_roots": ["*dwi-", "*dwo"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "bi-", "meaning": "2つ", "orig": "ラテン bis / bini", "examples": "bicycle, bilingual, binary, biannual"}, {"pie": "*dwi-（二つ）← *dwo → ギリシャ語 dis", "pie_roots": ["*dwi-", "*dwo"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "di-", "meaning": "2つ", "orig": "ギリシャ dis", "examples": "dioxide, dilemma, dipole, diphthong"}], "parent": null}, {"root": "*dʰeh₁-", "entries": [{"pie": "*dʰeh₁-（置く・設定する）", "pie_roots": ["*dʰeh₁-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "fac-", "meaning": "する・作る", "orig": "ラテン facere", "examples": "factory, effect, efficient, artifact"}, {"pie": "*kerd-（心・信じる）← *kerd-（心臓）+ *dʰeh₁-（置く）", "pie_roots": ["*kerd-", "*dʰeh₁-"], "is_compound": true, "origin": "ラテン", "type": "root", "form": "cred", "meaning": "信じる", "orig": "ラテン credere", "examples": "credit, incredible, credible, creed, credential"}, {"pie": "*dʰeh₁-（置く・設定する）", "pie_roots": ["*dʰeh₁-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "the-", "meaning": "置く・設定する", "orig": "ギリシャ tithenai（置く）", "examples": "thesis, synthesis, antithesis, hypothesis, synthetic, epithet"}, {"pie": "*dʰeh₁-（置く・する）", "pie_roots": ["*dʰeh₁-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-ify", "meaning": "〜にする・〜化する", "orig": "ラテン -ficare（facere）", "examples": "simplify, justify, magnify, terrify, clarify"}, {"pie": "*dʰeh₁-（置く・定める）", "pie_roots": ["*dʰeh₁-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-dom", "meaning": "領域・状態・集団", "orig": "古英語 -dom", "examples": "freedom, kingdom, wisdom, boredom, stardom"}], "parent": null}, {"root": "*dʰer-", "entries": [{"pie": "*dʰer-（形・支持する）（諸説あり）", "pie_roots": ["*dʰer-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "form", "meaning": "形・形成", "orig": "ラテン forma", "examples": "form, reform, uniform, transform, information"}, {"pie": "*dʰer-（形・形成）", "pie_roots": ["*dʰer-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-form", "meaning": "〜の形をした", "orig": "ラテン forma", "examples": "uniform, cuneiform, cruciform, vermiform"}], "parent": null}, {"root": "*dʰewbʰ-", "entries": [{"pie": "*dʰewbʰ-（恐れる）（諸説あり）", "pie_roots": ["*dʰewbʰ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "timor", "meaning": "恐れ・内的な不安", "orig": "ラテン timere（語源不明）", "examples": "timid, timorous, intimidate"}], "parent": null}, {"root": "*dʰewH-", "entries": [{"pie": "*dʰewH-（力・流れ）（諸説あり）", "pie_roots": ["*dʰewH-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "dynam", "meaning": "力・エネルギー", "orig": "ギリシャ dynamis", "examples": "dynamic, dynamics, thermodynamics, aerodynamics"}], "parent": null}, {"root": "*dʰeǵʰ-", "entries": [{"pie": "*dʰeǵʰ-（良い）→ ラテン語 bonus/bene（諸説あり）", "pie_roots": ["*dʰeǵʰ-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "bene-", "meaning": "良い", "orig": "ラテン bene（→古仏 bon）", "examples": "benefit, benevolent, bonus"}], "parent": null}, {"root": "*dʰubʰ-", "entries": [{"pie": "*dʰubʰ-（深い・谷）→ 古英語 dun（諸説あり）", "pie_roots": ["*dʰubʰ-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "down-", "meaning": "下へ・低下", "orig": "古英語 dun", "examples": "download, downgrade, downfall, downside"}], "parent": null}, {"root": "*egʰs", "entries": [{"pie": "*egʰs（外へ）+ *-teros（対照接尾辞）→ 奪格形 extra", "pie_roots": ["*egʰs", "*-teros"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "extra-", "meaning": "外に・超えて", "orig": "ラテン extra ← exterus（外の）の奪格形", "examples": "extraordinary, extraterrestrial, extrovert"}, {"pie": "*egʰs（外へ）", "pie_roots": ["*egʰs"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ex-", "meaning": "外へ・元〜", "orig": "ラテン ex（ギリシャ語形 ek-）", "examples": "export, ex-president, emit, eject"}], "parent": null}, {"root": "*en", "entries": [{"pie": "*enter（間に）← *en（中に）+ 比較接尾辞", "pie_roots": ["*enter", "*en"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "inter-", "meaning": "間に・相互", "orig": "ラテン inter", "examples": "international, interact, internet, interview"}, {"pie": "*en（中に）→ ギリシャ語 endon", "pie_roots": ["*en"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "endo-", "meaning": "内に・内側の", "orig": "ギリシャ endon（内に）", "examples": "endocrine, endoscope, endogenous, endorphin"}, {"pie": "*en（中に）→ ラテン語 intra", "pie_roots": ["*en"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "intra-", "meaning": "内側に", "orig": "ラテン intra", "examples": "intranet, intramural, intravenous"}, {"pie": "*en（中に）→ ラテン語 in → 古仏 en-", "pie_roots": ["*en"], "is_compound": false, "origin": "フランス", "type": "prefix", "form": "en-", "meaning": "〜にする・〜の中に入れる", "orig": "ラテン in-（→古仏 en-）", "examples": "enable, empower, encourage, enforce, embrace, enclose"}], "parent": null}, {"root": "*enter", "entries": [{"pie": "*enter（間に）← *en（中に）+ 比較接尾辞", "pie_roots": ["*enter", "*en"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "inter-", "meaning": "間に・相互", "orig": "ラテン inter", "examples": "international, interact, internet, interview"}], "parent": "*en"}, {"root": "*friaz", "entries": [{"pie": "*preyH-（好む・愛する）→ プロト・ゲルマン語 *friaz（beloved・自由な）", "pie_roots": ["*preyH-", "*friaz"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-free", "meaning": "〜のない", "orig": "古英語 freo ← プロト・ゲルマン語 *friaz", "examples": "sugar-free, gluten-free, carefree, tax-free"}], "parent": null}, {"root": "*fura-", "entries": [{"pie": "*per-（前方へ）→ ゲルマン語 *fura-", "pie_roots": ["*per-", "*fura-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "fore-", "meaning": "前に・予め", "orig": "古英語 fore", "examples": "forecast, foresee, foreword, forefront"}], "parent": null}, {"root": "*genH₁-", "entries": [{"pie": "*genH₁-（生む・生じる）", "pie_roots": ["*genH₁-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "gen", "meaning": "生む・種族", "orig": "ラテン genus / ギリシャ genos", "examples": "generate, gene, genius, gender, hydrogen"}], "parent": null}, {"root": "*gerbh-", "entries": [{"pie": "*gerbh-（引っ掻く・彫る）", "pie_roots": ["*gerbh-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "graph-", "meaning": "書く・記録", "orig": "ギリシャ graphein", "examples": "photograph, telegram, grammar, biography"}], "parent": null}, {"root": "*ghel-", "entries": [{"pie": "*ghel-(2)（輝く・黄色）", "pie_roots": ["*ghel-"], "is_compound": false, "origin": "古英語", "type": "root", "form": "gl-", "meaning": "輝く・光る・滑らか", "orig": "ゲルマン語 gl- 語群", "examples": "glow, gleam, glitter, glisten, glimmer, glint, glare, glass, glide, glad"}], "parent": null}, {"root": "*ghredh-", "entries": [{"pie": "*ghredh-（歩く・進む）", "pie_roots": ["*ghredh-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "grad-", "meaning": "歩く・進む", "orig": "ラテン gradi", "examples": "progress, grade, gradual, congress, aggressive"}], "parent": null}, {"root": "*gneh₃-", "entries": [{"pie": "*gneh₃-（知る）", "pie_roots": ["*gneh₃-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "cogn", "meaning": "知る", "orig": "ラテン cognoscere", "examples": "recognize, cognition, cognitive, incognito"}, {"pie": "*gneh₃-（知る）", "pie_roots": ["*gneh₃-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "gnos", "meaning": "知る", "orig": "ギリシャ gignoskein", "examples": "diagnosis, agnostic, prognosis, gnosis"}, {"pie": "*gneh₃-（知る）← norma（知られた基準）", "pie_roots": ["*gneh₃-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "norm", "meaning": "規則・基準", "orig": "ラテン norma", "examples": "normal, normalize, norm, abnormal"}], "parent": null}, {"root": "*gras-", "entries": [{"pie": "*gras-（食べる・飲み込む）（諸説あり）", "pie_roots": ["*gras-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "gastr-", "meaning": "胃・腹部", "orig": "ギリシャ gaster（胃・腹）", "examples": "gastric, gastronomy, gastroenterology, gastropod"}], "parent": null}, {"root": "*gāu-", "entries": [{"pie": "*gāu-（喜ぶ）→ ラテン語 gaudere", "pie_roots": ["*gāu-"], "is_compound": false, "origin": "フランス", "type": "root", "form": "joy", "meaning": "喜び※自由形態素だが enjoy- / joyful などの複合・派生の基盤として掲載", "orig": "フランス joie", "examples": "joy, enjoy, enjoyment, joyful"}, {"pie": "*gāu-（喜ぶ）", "pie_roots": ["*gāu-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "gaud", "meaning": "喜び・祝い", "orig": "ラテン gaudere → gaudium", "examples": "gaudy※現代では「けばけばしい」と否定的な意味に転化"}], "parent": null}, {"root": "*gʷerH-", "entries": [{"pie": "*gʷerH-（飲み込む・貪る）", "pie_roots": ["*gʷerH-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "vor-", "meaning": "食べる・貪る", "orig": "ラテン vorare（飲み込む）/ vour はフランス語経由（o→ou の音変化）", "examples": "carnivore, herbivore, omnivore, voracious / devour"}, {"pie": "*gʷerH-（称える・感謝する）", "pie_roots": ["*gʷerH-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "grat", "meaning": "感謝・喜び", "orig": "ラテン gratus", "examples": "grateful, gratitude, gratify, congratulate"}], "parent": null}, {"root": "*gʷeyH-", "entries": [{"pie": "*gʷeyH-（生きる）", "pie_roots": ["*gʷeyH-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "vi-", "meaning": "生きる", "orig": "ラテン vita / vivere", "examples": "vital, survive, vivid, vitamin, revive"}], "parent": null}, {"root": "*gʷher-", "entries": [{"pie": "*gʷher-（熱・暖かい）", "pie_roots": ["*gʷher-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "therm", "meaning": "熱", "orig": "ギリシャ thermē（thermo- は therm + -o-）", "examples": "thermometer, thermal, thermostat, thermodynamics"}], "parent": null}, {"root": "*gʷiH-", "entries": [{"pie": "*gʷiH-（生きる）→ ギリシャ語 bios", "pie_roots": ["*gʷiH-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "bi-", "meaning": "生命・生物", "orig": "ギリシャ bios", "examples": "biotechnology, biochemistry, biometric"}, {"pie": "*gʷiH-（生きる）", "pie_roots": ["*gʷiH-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "bi-", "meaning": "生命", "orig": "ギリシャ bios（bio- は bi- + 連結母音 -o-）", "examples": "biology, biography, antibiotic, biodiversity"}], "parent": null}, {"root": "*gʷā-", "entries": [{"pie": "*gʷā-（来る・行く）", "pie_roots": ["*gʷā-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ven-", "meaning": "来る", "orig": "ラテン venire", "examples": "advent, convention, prevent, invent"}], "parent": null}, {"root": "*gʷʰī-", "entries": [{"pie": "*gʷʰī-（繊維・糸）（諸説あり）", "pie_roots": ["*gʷʰī-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "fibr", "meaning": "繊維", "orig": "ラテン fibra", "examples": "fiber, fibration, fiber bundle"}], "parent": null}, {"root": "*h₁dónts", "entries": [{"pie": "*h₁dónts（歯）", "pie_roots": ["*h₁dónts"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "dent-", "meaning": "歯", "orig": "ラテン dens / ギリシャ odous / odontos", "examples": "dental, dentist, trident, orthodontic, periodontist"}], "parent": null}, {"root": "*h₁egni-", "entries": [{"pie": "*h₁egni-（火）", "pie_roots": ["*h₁egni-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ign", "meaning": "火・点火", "orig": "ラテン ignis", "examples": "ignite, ignition, reignite, igneous"}], "parent": null}, {"root": "*h₁epi", "entries": [{"pie": "*h₁epi（上に・近くに）", "pie_roots": ["*h₁epi"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "epi-", "meaning": "上に・後に・付加・外側", "orig": "ギリシャ epi（上に・近くに）", "examples": "epidemic, epidermis, epilogue, epitaph, episode, epigenetics"}, {"pie": "*h₁epi / *opi（向かって・対して）", "pie_roots": ["*h₁epi", "*opi"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ob-", "meaning": "向かって・対して", "orig": "ラテン ob", "examples": "object, obstacle, observe, obtain"}], "parent": null}, {"root": "*h₁nómn̥", "entries": [{"pie": "*h₁nómn̥（名前）", "pie_roots": ["*h₁nómn̥"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "nym-", "meaning": "名前", "orig": "ギリシャ onoma", "examples": "synonym, antonym, anonymous, pseudonym"}], "parent": null}, {"root": "*h₁su-", "entries": [{"pie": "*h₁su-（良い）→ ギリシャ語 eu", "pie_roots": ["*h₁su-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "eu-", "meaning": "良い・正常", "orig": "ギリシャ eu", "examples": "euphoria, eulogy, euphemism, euthanasia"}], "parent": null}, {"root": "*h₂ed", "entries": [{"pie": "*h₂ed（〜へ・向かって）", "pie_roots": ["*h₂ed"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ad-", "meaning": "〜に向かって", "orig": "ラテン ad-（次の子音に同化、sc-/sp-/st- 前では a-）", "examples": "advance, adapt, admit, ascend, aspire, accent, affirm, aggress, allocate, announce, appear, arrive, assist, attract"}], "parent": null}, {"root": "*h₂ekʷā-", "entries": [{"pie": "*h₂ekʷā-（水）", "pie_roots": ["*h₂ekʷā-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "aqua", "meaning": "水", "orig": "ラテン aqua", "examples": "aquarium, aquatic, aquifer, aqueduct"}], "parent": null}, {"root": "*h₂embʰi", "entries": [{"pie": "*h₂embʰi（両側に・周りに）", "pie_roots": ["*h₂embʰi"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ambi-", "meaning": "両方・周囲・あいまい", "orig": "ラテン ambo（両方）", "examples": "ambiguous, ambidextrous, ambivalent, ambience, ambitious"}], "parent": null}, {"root": "*h₂enti", "entries": [{"pie": "*h₂enti（前に・向かい合って）", "pie_roots": ["*h₂enti"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "anti-", "meaning": "反対・対抗", "orig": "ギリシャ anti", "examples": "antibody, antiwar, anticlockwise, antidote"}, {"pie": "*kom（共に）+ *h₂enti（向かい合って）", "pie_roots": ["*kom", "*h₂enti"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "counter-", "meaning": "反対・対抗", "orig": "ラテン contra（→古仏 contre）", "examples": "counterattack, counterpart, counteract"}, {"pie": "*h₂enti（前に・向かい合って）", "pie_roots": ["*h₂enti"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ante-", "meaning": "前に（時間・位置）", "orig": "ラテン ante", "examples": "antecedent, antedate, anteroom"}], "parent": null}, {"root": "*h₂epo", "entries": [{"pie": "*h₂epo（離れて・から）", "pie_roots": ["*h₂epo"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ab-", "meaning": "離れて", "orig": "ラテン ab / abs", "examples": "absent, abstract, abnormal, absorb"}], "parent": null}, {"root": "*h₂erHkʷ-", "entries": [{"pie": "*h₂erHkʷ-（始め・命令）", "pie_roots": ["*h₂erHkʷ-"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-arch", "meaning": "支配者・始まり", "orig": "ギリシャ arkhos", "examples": "monarchy, patriarch, anarchy, hierarchy"}], "parent": null}, {"root": "*h₂ew-", "entries": [{"pie": "*h₂ew-（感じ取る・理解する）", "pie_roots": ["*h₂ew-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "aud", "meaning": "聞く", "orig": "ラテン audire", "examples": "audible, audience, audition, auditorium（※語幹母音 -ī- を伴い aud+ī- の形で現れることが多い）"}], "parent": null}, {"root": "*h₂eḱ-", "entries": [{"pie": "*h₂eḱ-（鋭い・先端）", "pie_roots": ["*h₂eḱ-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "oxy", "meaning": "酸素・鋭い", "orig": "ギリシャ oxys", "examples": "oxygen, oxide, oxidize, dioxide"}], "parent": null}, {"root": "*h₂ster-", "entries": [{"pie": "*h₂ster-（星）", "pie_roots": ["*h₂ster-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "astr-", "meaning": "星・宇宙", "orig": "ギリシャ astron", "examples": "astronomy, astronaut, asteroid, disaster"}], "parent": null}, {"root": "*h₂weh₁-", "entries": [{"pie": "*h₂weh₁-（吹く・風）", "pie_roots": ["*h₂weh₁-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "vent", "meaning": "風", "orig": "ラテン ventus", "examples": "ventilate, ventilation,vent"}], "parent": null}, {"root": "*h₃ekʷ-", "entries": [{"pie": "*h₃ekʷ-（目・見る）", "pie_roots": ["*h₃ekʷ-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "opt", "meaning": "視覚・光学", "orig": "ギリシャ optos", "examples": "optical, optics, optician, optometrist"}, {"pie": "*h₃ekʷ-（目・見る）", "pie_roots": ["*h₃ekʷ-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "ophthalm", "meaning": "目・眼球", "orig": "ギリシャ ophthalmos", "examples": "ophthalmology, ophthalmoscope"}], "parent": null}, {"root": "*h₃reǵ-", "entries": [{"pie": "*h₃reǵ-（直線・支配する）", "pie_roots": ["*h₃reǵ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "reg-", "meaning": "支配・正す", "orig": "ラテン regere", "examples": "regulate, correct, direct, rector"}], "parent": null}, {"root": "*kaput-", "entries": [{"pie": "*kaput-（頭）", "pie_roots": ["*kaput-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "capit-", "meaning": "頭", "orig": "ラテン caput", "examples": "capital, captain, chapter, decapitate"}], "parent": null}, {"root": "*keh₂p-", "entries": [{"pie": "*keh₂p-（掴む・取る）", "pie_roots": ["*keh₂p-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "cap-", "meaning": "掴む・取る", "orig": "ラテン capere", "examples": "capture, accept, receive, participate, concept"}], "parent": null}, {"root": "*kel-", "entries": [{"pie": "*kel-（石灰・石）（諸説あり）", "pie_roots": ["*kel-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "calc", "meaning": "石灰・カルシウム", "orig": "ラテン calx", "examples": "calcium, calculate, calculus, calcify"}, {"pie": "*kel-（石灰・石）← 石で数えた", "pie_roots": ["*kel-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "calcul", "meaning": "小石・計算", "orig": "ラテン calculus", "examples": "calculate, calculus, miscalculate"}], "parent": null}, {"root": "*ker-", "entries": [{"pie": "*sker-(*ker-)（曲がる）→ ラテン語 circum", "pie_roots": ["*sker-", "*ker-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "circum-", "meaning": "周りを", "orig": "ラテン circum", "examples": "circumference, circumnavigate, circumstance"}, {"pie": "*sker-(*ker-)（曲がる・回る）の重複形 *ki-kro-", "pie_roots": ["*sker-", "*ker-", "*ki-kro-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "circ", "meaning": "円・環", "orig": "ラテン circus ← ギリシャ語 kirkos/krikos（円・輪）", "examples": "circle, circuit, circulate, circus, circumference"}, {"pie": "*skribh-（切る・刻む）← *sker-(*ker-)（切る）の拡張形", "pie_roots": ["*skribh-", "*sker-", "*ker-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "scrib-", "meaning": "書く", "orig": "ラテン scribere", "examples": "describe, manuscript, inscription, subscribe"}, {"pie": "*ker-（燃える・火）（諸説あり）", "pie_roots": ["*ker-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "carb", "meaning": "炭素", "orig": "ラテン carbo", "examples": "carbon, carbonate, carbohydrate, carbonize"}, {"pie": "*sker-(*ker-)（切る・形作る）", "pie_roots": ["*sker-", "*ker-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ship", "meaning": "状態・技能・関係", "orig": "古英語 -scipe", "examples": "friendship, leadership, scholarship, citizenship"}], "parent": null}, {"root": "*kerd-", "entries": [{"pie": "*kerd-（心・信じる）← *kerd-（心臓）+ *dʰeh₁-（置く）", "pie_roots": ["*kerd-", "*dʰeh₁-"], "is_compound": true, "origin": "ラテン", "type": "root", "form": "cred", "meaning": "信じる", "orig": "ラテン credere", "examples": "credit, incredible, credible, creed, credential"}, {"pie": "*kerd-（心臓）", "pie_roots": ["*kerd-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "card", "meaning": "心臓", "orig": "ギリシャ kardia", "examples": "cardiac, cardiology, cardiopulmonary"}, {"pie": "*kerd-（心臓）", "pie_roots": ["*kerd-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "cord", "meaning": "心・一致", "orig": "ラテン cor/cordis", "examples": "accord, discord, record, cordial"}], "parent": null}, {"root": "*kers-", "entries": [{"pie": "*kers-（走る）", "pie_roots": ["*kers-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "cur-", "meaning": "走る", "orig": "ラテン currere / cursus", "examples": "current, occur, course, discourse"}, {"pie": "*kers-（走る）", "pie_roots": ["*kers-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "cur-", "meaning": "気にする・注意", "orig": "ラテン cura", "examples": "curious, cure, accurate, procure"}], "parent": null}, {"root": "*ki-kro-", "entries": [{"pie": "*sker-(*ker-)（曲がる・回る）の重複形 *ki-kro-", "pie_roots": ["*sker-", "*ker-", "*ki-kro-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "circ", "meaning": "円・環", "orig": "ラテン circus ← ギリシャ語 kirkos/krikos（円・輪）", "examples": "circle, circuit, circulate, circus, circumference"}], "parent": null}, {"root": "*kom", "entries": [{"pie": "*kom（共に）+ *h₂enti（向かい合って）", "pie_roots": ["*kom", "*h₂enti"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "counter-", "meaning": "反対・対抗", "orig": "ラテン contra（→古仏 contre）", "examples": "counterattack, counterpart, counteract"}, {"pie": "*kom（共に・一緒に）", "pie_roots": ["*kom"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "com-", "meaning": "共に・一緒に", "orig": "ラテン com-（次の子音に同化、母音・h・gn の前→co-）", "examples": "combine, connect, collect, correspond, cooperate, coexist, coerce, cohabit, cognition"}], "parent": null}, {"root": "*kom-", "entries": [{"pie": "*kom-（共に）+ *-teros（対照接尾辞）+ 奪格語尾", "pie_roots": ["*kom-", "*-teros"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "contra-", "meaning": "反対・逆", "orig": "ラテン contra", "examples": "contradict, contraband, contrast"}], "parent": null}, {"root": "*krep-", "entries": [{"pie": "*krep-（体・形）", "pie_roots": ["*krep-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "corp", "meaning": "身体", "orig": "ラテン corpus", "examples": "corporation, corpse, corporal, incorporate"}], "parent": null}, {"root": "*krews-", "entries": [{"pie": "*krews-（十字・曲がる）→ ラテン語 crux（諸説あり）", "pie_roots": ["*krews-"], "is_compound": false, "origin": "その他", "type": "prefix", "form": "cross-", "meaning": "交差・横断", "orig": "古ノルド語 kross（← ラテン crux）", "examples": "crossroad, cross-cultural, crossover, cross-examine"}], "parent": null}, {"root": "*kwenth-", "entries": [{"pie": "*kwenth-（苦しむ・感じる）", "pie_roots": ["*kwenth-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "path", "meaning": "感情・苦しみ・病", "orig": "ギリシャ pathos", "examples": "sympathy, empathy, pathology, apathy, psychopath"}], "parent": null}, {"root": "*kʷel-", "entries": [{"pie": "*kʷel-（遠い・果て）→ ギリシャ語 tele（諸説あり）", "pie_roots": ["*kʷel-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "tele-", "meaning": "遠くの・遠隔", "orig": "ギリシャ tele", "examples": "telephone, television, telescope, telepathy"}], "parent": null}, {"root": "*kʷetwor-", "entries": [{"pie": "*kʷetwor-（四つ）→ ラテン語 quattuor", "pie_roots": ["*kʷetwor-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "quad-", "meaning": "4つ", "orig": "ラテン quattuor", "examples": "quadrant, quadruple, quadrilateral"}, {"pie": "*kʷetwor-（四つ）→ ギリシャ語 tessares", "pie_roots": ["*kʷetwor-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "tetra-", "meaning": "4つ", "orig": "ギリシャ tessares", "examples": "tetrahedron, tetragon, tetrapod"}], "parent": null}, {"root": "*kʷod", "entries": [{"pie": "*kʷod（どのように）+ *si（もし）→ ラテン語 quasi", "pie_roots": ["*kʷod", "*si"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "quasi-", "meaning": "あたかも〜のように・擬", "orig": "ラテン quasi", "examples": "quasi-isomorphism, quasigroup, quasi-category"}], "parent": null}, {"root": "*leg-", "entries": [{"pie": "*leg-（集める・選ぶ・語る）", "pie_roots": ["*leg-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "log-", "meaning": "言葉・論理・学問", "orig": "ギリシャ logos", "examples": "logic, dialogue, monologue, biology, apology"}, {"pie": "*leg-（集める・選ぶ・読む）", "pie_roots": ["*leg-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "leg-", "meaning": "読む・選ぶ・集める", "orig": "ラテン legere（読む・選ぶ）", "examples": "legend, lecture, elect, select, collect, eligible, intelligent, neglect"}, {"pie": "*leg-（集める・語る）", "pie_roots": ["*leg-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "log (比・対数)", "meaning": "比・対数（数学文脈）", "orig": "ギリシャ logos", "examples": "logic, logarithm, dialogue, analogy"}, {"pie": "*leg-（集める・選ぶ）", "pie_roots": ["*leg-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "leg", "meaning": "法・読む", "orig": "ラテン lex/legere", "examples": "legal, legislate, legitimate, privilege"}], "parent": null}, {"root": "*leu-", "entries": [{"pie": "*leu-（緩める・解く）", "pie_roots": ["*leu-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "ly", "meaning": "解く・解放する", "orig": "ギリシャ lyein（解く）", "examples": "analysis, catalysis, paralysis, electrolysis, dialysis"}, {"pie": "*leu-（緩める・切り離す）", "pie_roots": ["*leu-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-less", "meaning": "〜のない・欠如", "orig": "古英語 -leas", "examples": "hopeless, careless, homeless, endless, worthless"}], "parent": null}, {"root": "*leudʰ-", "entries": [{"pie": "*leudʰ-（成長する・自由人）", "pie_roots": ["*leudʰ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "liber", "meaning": "自由", "orig": "ラテン liber", "examples": "liberty, liberal, liberate, deliberate"}], "parent": null}, {"root": "*lewk-", "entries": [{"pie": "*lewk-（光・輝き）", "pie_roots": ["*lewk-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "luc-", "meaning": "光", "orig": "ラテン lux/lumen", "examples": "lucid, illuminate, luminous, translucent"}, {"pie": "*lewk-（光）← ラテン語 luna（光るもの）", "pie_roots": ["*lewk-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "luna-", "meaning": "月", "orig": "ラテン luna", "examples": "lunar, lunatic"}], "parent": null}, {"root": "*leyg-", "entries": [{"pie": "*leyg-（似た）", "pie_roots": ["*leyg-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-like", "meaning": "〜のような半接尾辞", "orig": "古英語 -lic", "examples": "lifelike, dreamlike, godlike, warlike"}, {"pie": "*leyg-（似た・体）", "pie_roots": ["*leyg-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ly", "meaning": "〜に・〜のように", "orig": "古英語 -lice", "examples": "quickly, easily, completely, surprisingly, deeply"}], "parent": null}, {"root": "*man-", "entries": [{"pie": "*man-(2)（手）", "pie_roots": ["*man-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "man-", "meaning": "手", "orig": "ラテン manus", "examples": "manual, manufacture, manuscript, manage"}], "parent": null}, {"root": "*maḱ-", "entries": [{"pie": "*maḱ-（長い・大きい）→ ギリシャ語 makros", "pie_roots": ["*maḱ-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "macr-", "meaning": "大きい", "orig": "ギリシャ makros", "examples": "macroeconomics, macroscopic, macro"}], "parent": null}, {"root": "*me", "entries": [{"pie": "*me（中に・共に）→ ギリシャ語 meta", "pie_roots": ["*me"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "meta-", "meaning": "超越・変化・自己参照・後に", "orig": "ギリシャ meta（共に・後に・超えて）", "examples": "metaphor, metamorphosis, metabolism, metadata, metacognition"}], "parent": null}, {"root": "*meh₁-", "entries": [{"pie": "*meh₁-（測る）", "pie_roots": ["*meh₁-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "metr-", "meaning": "測る・単位", "orig": "ギリシャ metron", "examples": "geometry, symmetry, thermometer, parameter"}], "parent": null}, {"root": "*meith-", "entries": [{"pie": "*meith-（交換する・行く）", "pie_roots": ["*meith-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "mit-", "meaning": "送る", "orig": "ラテン mittere", "examples": "transmit, mission, dismiss, commit, emit"}, {"pie": "*meith-（交換する・変わる）", "pie_roots": ["*meith-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "mut", "meaning": "変わる", "orig": "ラテン mutare", "examples": "mutation, mutant, commute, transmute, immutable"}], "parent": null}, {"root": "*mel-", "entries": [{"pie": "*mel-（多い）→ ラテン語 multus", "pie_roots": ["*mel-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "multi-", "meaning": "多数", "orig": "ラテン multus", "examples": "multiply, multilingual, multimedia, multitask"}], "parent": null}, {"root": "*men-", "entries": [{"pie": "*men-（小さい・単一）→ ギリシャ語 monos", "pie_roots": ["*men-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "mon-", "meaning": "1つ（単一）", "orig": "ギリシャ monos", "examples": "monologue, monopoly, monotone, monarch"}, {"pie": "*men-（思考する・精神）", "pie_roots": ["*men-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "mem", "meaning": "覚える", "orig": "ラテン memor", "examples": "memory, remember, memorial, memorize"}, {"pie": "*men-（突き出る・小さい）", "pie_roots": ["*men-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "min", "meaning": "小さい", "orig": "ラテン minor", "examples": "minimum, minor, minute, miniature, diminish"}, {"pie": "*men-（思考・精神・狂気）", "pie_roots": ["*men-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "mania", "meaning": "狂気・熱狂", "orig": "ギリシャ maínomai（狂う）", "examples": "mania, kleptomania, pyromania, maniac, manic"}, {"pie": "*men-（思考する・精神）", "pie_roots": ["*men-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ment", "meaning": "心・精神・理性", "orig": "ラテン mens / mentis", "examples": "mental, mention, comment, demented, vehement"}, {"pie": "*men-（思考する・精神）", "pie_roots": ["*men-"], "is_compound": false, "origin": "古英語", "type": "root", "form": "mind", "meaning": "心・記憶・知性※自由形態素（単独で語として成立）だが *men- 族との関係で掲載", "orig": "古英語 gemynd", "examples": "mind, mindful, remind, mindset, mastermind"}, {"pie": "*men-（思考する・精神）", "pie_roots": ["*men-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "mnem", "meaning": "記憶", "orig": "ギリシャ mneme", "examples": "mnemonic, amnesia, mnemonics"}, {"pie": "*men-（考える）+ *-to-（形容詞化接尾辞）", "pie_roots": ["*men-", "*-to-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-ment", "meaning": "行為・結果・手段", "orig": "ラテン -mentum（→フランス）", "examples": "movement, government, treatment, argument"}], "parent": null}, {"root": "*mer-", "entries": [{"pie": "*mer-（死ぬ）", "pie_roots": ["*mer-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "mor-", "meaning": "死", "orig": "ラテン mors", "examples": "mortal, immortal, morgue, mortgage"}], "parent": null}, {"root": "*meue-", "entries": [{"pie": "*meue-（動く・押す）", "pie_roots": ["*meue-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "mov-", "meaning": "動く", "orig": "ラテン movere", "examples": "move, motion, mobile, motor, emotion"}], "parent": null}, {"root": "*meǵ-", "entries": [{"pie": "*meǵ-（大きい）→ ギリシャ語 megas", "pie_roots": ["*meǵ-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "mega-", "meaning": "100万・巨大", "orig": "ギリシャ megas", "examples": "megabyte, megawatt, megalopolis, megaphone"}, {"pie": "*meǵ-（大きい）→ ギリシャ語 gigas（諸説あり）", "pie_roots": ["*meǵ-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "giga-", "meaning": "10億", "orig": "ギリシャ gigas", "examples": "gigabyte, gigawatt, gigahertz"}, {"pie": "*meǵ-（大きい）", "pie_roots": ["*meǵ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "magn", "meaning": "大きい", "orig": "ラテン magnus", "examples": "magnitude, magnify, magnificent, magnet"}, {"pie": "*meǵ-（大きい）", "pie_roots": ["*meǵ-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-most", "meaning": "最も〜の位置・程度にある半接尾辞", "orig": "古英語 mǣst（→ most）", "examples": "innermost, uppermost, foremost, utmost, outmost"}], "parent": null}, {"root": "*missa-", "entries": [{"pie": "*missa-（誤って）→ ゲルマン語 *missa-（PIE不明）", "pie_roots": ["*missa-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "mis-", "meaning": "誤って・悪く", "orig": "古英語 mis-", "examples": "mistake, mislead, misunderstand, misuse"}], "parent": null}, {"root": "*ne", "entries": [{"pie": "*ne（否定粒子）→ ゲルマン語 *un-", "pie_roots": ["*ne", "*un-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "un-", "meaning": "否定・逆", "orig": "古英語 un-", "examples": "unhappy, undo, unfair, unlock, unkind"}, {"pie": "*ne（否定粒子）→ ラテン語 in-（零グレード *n̥-）", "pie_roots": ["*ne", "*n̥-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "in-", "meaning": "否定（語に応じて変化）", "orig": "ラテン in-", "examples": "impossible, illegal, irregular, inactive"}, {"pie": "*ne（否定粒子）→ ラテン語 non", "pie_roots": ["*ne"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "non-", "meaning": "非〜・無〜", "orig": "ラテン non", "examples": "nonprofit, nonfiction, nonsense, nonverbal"}, {"pie": "*ne の零グレード *n̥- → ギリシャ語 a(n)-", "pie_roots": ["*ne", "*n̥-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "a-", "meaning": "否定（主にギリシャ語系）", "orig": "ギリシャ a- / an-", "examples": "amoral, atheist, anarchy, anonymous"}], "parent": null}, {"root": "*nem-", "entries": [{"pie": "*nem-（分配する・管理する）", "pie_roots": ["*nem-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "nom", "meaning": "法・管理・配分", "orig": "ギリシャ nomos / nemein", "examples": "astronomy, taxonomy, autonomy, economy, gastronomy, metronome"}, {"pie": "*nem-（分配する）← ラテン語 numerus", "pie_roots": ["*nem-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "numer", "meaning": "数・数える", "orig": "ラテン numerus", "examples": "numeral, numerous, enumerate, numerology, supernumerary"}], "parent": null}, {"root": "*newos-", "entries": [{"pie": "*newos-（新しい）→ ギリシャ語 neos", "pie_roots": ["*newos-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "neo-", "meaning": "新しい", "orig": "ギリシャ neos", "examples": "neoclassical, neologism, neonatal"}, {"pie": "*newos-（新しい）", "pie_roots": ["*newos-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "nov", "meaning": "新しい", "orig": "ラテン novus", "examples": "novel, innovate, renovate, novelty, novice"}], "parent": null}, {"root": "*n̥-", "entries": [{"pie": "*ne（否定粒子）→ ラテン語 in-（零グレード *n̥-）", "pie_roots": ["*ne", "*n̥-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "in-", "meaning": "否定（語に応じて変化）", "orig": "ラテン in-", "examples": "impossible, illegal, irregular, inactive"}, {"pie": "*ne の零グレード *n̥- → ギリシャ語 a(n)-", "pie_roots": ["*ne", "*n̥-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "a-", "meaning": "否定（主にギリシャ語系）", "orig": "ギリシャ a- / an-", "examples": "amoral, atheist, anarchy, anonymous"}], "parent": null}, {"root": "*n̥dʰer-", "entries": [{"pie": "*n̥dʰer-（下に）← *n̥dʰo（下の）", "pie_roots": ["*n̥dʰer-", "*n̥dʰo"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "under-", "meaning": "不十分・下に", "orig": "古英語 under", "examples": "underestimate, underground, undermine"}], "parent": "*n̥dʰo"}, {"root": "*n̥dʰo", "entries": [{"pie": "*n̥dʰer-（下に）← *n̥dʰo（下の）", "pie_roots": ["*n̥dʰer-", "*n̥dʰo"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "under-", "meaning": "不十分・下に", "orig": "古英語 under", "examples": "underestimate, underground, undermine"}], "parent": null}, {"root": "*oi-no-", "entries": [{"pie": "*oi-no-（一つ）→ ラテン語 unus", "pie_roots": ["*oi-no-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "uni-", "meaning": "1つ（単一）", "orig": "ラテン unus", "examples": "uniform, unique, unity, universe"}], "parent": null}, {"root": "*opi", "entries": [{"pie": "*h₁epi / *opi（向かって・対して）", "pie_roots": ["*h₁epi", "*opi"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "ob-", "meaning": "向かって・対して", "orig": "ラテン ob", "examples": "object, obstacle, observe, obtain"}], "parent": null}, {"root": "*oḱtō", "entries": [{"pie": "*oḱtō（八つ）", "pie_roots": ["*oḱtō"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "oct-", "meaning": "8つ", "orig": "ラテン/ギリシャ octo", "examples": "octopus, October, octave, octagon"}], "parent": null}, {"root": "*ped-", "entries": [{"pie": "*ped-（足・踏む）", "pie_roots": ["*ped-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ped", "meaning": "足", "orig": "ラテン pes/pedis", "examples": "pedestrian, pedal, expedite, centipede"}, {"pie": "*ped-（足・踏む）", "pie_roots": ["*ped-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "pod", "meaning": "足", "orig": "ギリシャ pous/podos", "examples": "tripod, podium, octopod, arthropod"}], "parent": null}, {"root": "*peh₂-", "entries": [{"pie": "*peh₂-（全て）→ ギリシャ語 pas/pan", "pie_roots": ["*peh₂-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "pan-", "meaning": "すべて", "orig": "ギリシャ pas/pan", "examples": "pandemic, panorama, panacea, pantheon"}], "parent": null}, {"root": "*pel-", "entries": [{"pie": "*pel-(5)（突く・打つ・駆る）", "pie_roots": ["*pel-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "pell-", "meaning": "押す・追う", "orig": "ラテン pellere", "examples": "propel, repel, expel, impulse, compulsory"}], "parent": null}, {"root": "*pelH-", "entries": [{"pie": "*pelH-（多い・満ちた）→ ギリシャ語 polys", "pie_roots": ["*pelH-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "poly-", "meaning": "多数", "orig": "ギリシャ polys", "examples": "polygon, polymer, polyglot, polynomial"}, {"pie": "*pelH-（砦・都市）", "pie_roots": ["*pelH-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "polis-", "meaning": "都市・市民・政治", "orig": "ギリシャ polis", "examples": "politics, police, policy, metropolis, cosmopolitan"}], "parent": null}, {"root": "*pelə-", "entries": [{"pie": "*pelə-（満たす）", "pie_roots": ["*pelə-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ful", "meaning": "〜に満ちた・〜の性質を持つ", "orig": "古英語 -full", "examples": "beautiful, powerful, helpful, colorful, hopeful"}], "parent": null}, {"root": "*penkʷe", "entries": [{"pie": "*penkʷe（五つ）→ ギリシャ語 pente", "pie_roots": ["*penkʷe"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "penta-", "meaning": "5つ", "orig": "ギリシャ pente", "examples": "pentagon, pentagram, pentathlon"}, {"pie": "*penkʷe（五つ）→ ラテン語 quinque", "pie_roots": ["*penkʷe"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "quint-", "meaning": "5つ", "orig": "ラテン quintus", "examples": "quintet, quintuple, quintessence"}], "parent": null}, {"root": "*per-", "entries": [{"pie": "*prai-（前に）← *per-（前方へ）", "pie_roots": ["*prai-", "*per-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "pre-", "meaning": "前に・事前に", "orig": "ラテン prae", "examples": "preview, predict, precede, prehistoric, premature"}, {"pie": "*per-（前方へ）→ ゲルマン語 *fura-", "pie_roots": ["*per-", "*fura-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "fore-", "meaning": "前に・予め", "orig": "古英語 fore", "examples": "forecast, foresee, foreword, forefront"}, {"pie": "*per-（前方へ・通して）", "pie_roots": ["*per-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "per-", "meaning": "通して・完全に", "orig": "ラテン per", "examples": "perfect, perform, perceive, persist"}, {"pie": "*per-（傍らに）→ ギリシャ語 para", "pie_roots": ["*per-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "para-", "meaning": "傍ら・類似・異常・超えて", "orig": "ギリシャ para（傍らに・超えて）", "examples": "parallel, paradox, parasite, paragraph, paranormal, parachute"}, {"pie": "*per-（前方へ・周りに）→ ギリシャ語 peri", "pie_roots": ["*per-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "peri-", "meaning": "周囲に", "orig": "ギリシャ peri", "examples": "perimeter, peripheral, perihelion"}, {"pie": "*pro-（前に・前方へ）← *per-", "pie_roots": ["*pro-", "*per-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "pro-", "meaning": "前に・前方へ・支持して", "orig": "ラテン pro / ギリシャ pro", "examples": "produce, progress, promote, prologue, protest, pro-democracy, prototype, protocol, protagonist"}, {"pie": "*per-（導く・通過する）← *per-（前方へ）の拡張形", "pie_roots": ["*per-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "port", "meaning": "運ぶ", "orig": "ラテン portare", "examples": "transport, import, export, portable, portfolio"}], "parent": null}, {"root": "*pew-", "entries": [{"pie": "*pew-（清める・精製する）← 純化して計算する", "pie_roots": ["*pew-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "put-", "meaning": "考える・計算する", "orig": "ラテン putare（考える・清算する）", "examples": "compute, dispute, reputation, amputate, depute"}], "parent": null}, {"root": "*pleh₁-", "entries": [{"pie": "*pleh₁-（満ちる・人々）（諸説あり）", "pie_roots": ["*pleh₁-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "popul-", "meaning": "人々・公", "orig": "ラテン populus", "examples": "popular, population, public, republic"}], "parent": null}, {"root": "*poti-", "entries": [{"pie": "*poti-（主人・力ある）", "pie_roots": ["*poti-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "pot-", "meaning": "力・可能", "orig": "ラテン potis（力ある）/ poss- は pot+esse の縮合形（t→ss）", "examples": "potential, potent, possible, impossible, possess, power"}], "parent": null}, {"root": "*prai-", "entries": [{"pie": "*prai-（前に）← *per-（前方へ）", "pie_roots": ["*prai-", "*per-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "pre-", "meaning": "前に・事前に", "orig": "ラテン prae", "examples": "preview, predict, precede, prehistoric, premature"}], "parent": "*per-"}, {"root": "*preyH-", "entries": [{"pie": "*preyH-（好む・愛する）→ プロト・ゲルマン語 *friaz（beloved・自由な）", "pie_roots": ["*preyH-", "*friaz"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-free", "meaning": "〜のない", "orig": "古英語 freo ← プロト・ゲルマン語 *friaz", "examples": "sugar-free, gluten-free, carefree, tax-free"}, {"pie": "*preyH-（好む・愛する）または *pro- + *bʰuH-（諸説あり）", "pie_roots": ["*preyH-", "*bʰuH-"], "is_compound": true, "origin": "ラテン", "type": "suffix", "form": "-proof", "meaning": "〜を通さない・〜に耐える半接尾辞", "orig": "ラテン probare（→古仏 prove →古英語 prof）", "examples": "waterproof, bulletproof, fireproof, foolproof, soundproof"}], "parent": null}, {"root": "*pro-", "entries": [{"pie": "*pro-（前に・前方へ）← *per-", "pie_roots": ["*pro-", "*per-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "pro-", "meaning": "前に・前方へ・支持して", "orig": "ラテン pro / ギリシャ pro", "examples": "produce, progress, promote, prologue, protest, pro-democracy, prototype, protocol, protagonist"}, {"pie": "*pro-（前に）→ ラテン語 pronus（前傾きの）", "pie_roots": ["*pro-"], "is_compound": false, "origin": "ラテン", "type": "suffix", "form": "-prone", "meaning": "〜しがちな", "orig": "ラテン pronus（前傾きの・傾いている）", "examples": "error-prone, accident-prone, violence-prone"}], "parent": "*per-"}, {"root": "*psyche", "entries": [{"pie": "*bʰes-（吹く・息をする）← *psyche（息・魂）", "pie_roots": ["*bʰes-", "*psyche"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "psych", "meaning": "心・精神", "orig": "ギリシャ psyche", "examples": "psychology, psychiatry, psychic, psychopath"}], "parent": null}, {"root": "*péh₂wr̥", "entries": [{"pie": "*péh₂wr̥（火）", "pie_roots": ["*péh₂wr̥"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "pyr", "meaning": "火", "orig": "ギリシャ pyr", "examples": "pyrotechnics, pyre, pyromania"}], "parent": null}, {"root": "*reup-", "entries": [{"pie": "*reup-（壊れる・破裂する）", "pie_roots": ["*reup-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "rupt", "meaning": "壊れる・破裂する", "orig": "ラテン rumpere", "examples": "corrupt, interrupt, rupture, bankrupt, erupt"}], "parent": null}, {"root": "*se-", "entries": [{"pie": "*swe-(*se-)（自己）→ ゲルマン語 *selbaz", "pie_roots": ["*swe-", "*se-", "*selbaz"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "self-", "meaning": "自己", "orig": "古英語 self", "examples": "self-confidence, self-control, self-esteem"}, {"pie": "*sol-（単独）← *se-（分離）", "pie_roots": ["*sol-", "*se-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "sol-", "meaning": "一人・孤独", "orig": "ラテン solus", "examples": "solo, solitary, solitude, desolate"}], "parent": null}, {"root": "*sed-", "entries": [{"pie": "*sed-（座る・落ち着く → 退く）", "pie_roots": ["*sed-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ced-", "meaning": "行く・譲る", "orig": "ラテン cedere", "examples": "proceed, recede, excess, process, ancestor"}], "parent": null}, {"root": "*sekʷ-", "entries": [{"pie": "*sekʷ-（従う・仲間になる）", "pie_roots": ["*sekʷ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "soci", "meaning": "仲間・社会", "orig": "ラテン socius", "examples": "social, society, associate, sociology"}], "parent": null}, {"root": "*selbaz", "entries": [{"pie": "*swe-(*se-)（自己）→ ゲルマン語 *selbaz", "pie_roots": ["*swe-", "*se-", "*selbaz"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "self-", "meaning": "自己", "orig": "古英語 self", "examples": "self-confidence, self-control, self-esteem"}], "parent": null}, {"root": "*sem-", "entries": [{"pie": "*sem-（同じ・一つ）→ ギリシャ語 homos", "pie_roots": ["*sem-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "homo-", "meaning": "同じ・共通", "orig": "ギリシャ homos（同じ）", "examples": "homogeneous, homophone, homosexual, homonym"}, {"pie": "*sem-（同じ）の零グレード + *-teros → ギリシャ語 heteros", "pie_roots": ["*sem-", "*-teros"], "is_compound": true, "origin": "ギリシャ", "type": "prefix", "form": "hetero-", "meaning": "異なる・別の", "orig": "ギリシャ heteros（他の）", "examples": "heterogeneous, heterodox, heterosexual, heteronym"}, {"pie": "*sem-（共に・同じ）→ ギリシャ語 syn", "pie_roots": ["*sem-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "syn-", "meaning": "共に・同時に", "orig": "ギリシャ syn", "examples": "sympathy, symphony, synonym, synthesis"}, {"pie": "*sem-（一つ・同じ）", "pie_roots": ["*sem-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-some", "meaning": "〜の性質を持つ・〜に満ちた", "orig": "古英語 -sum（似た・同じような）", "examples": "awesome, troublesome, handsome, burdensome, wholesome, gruesome"}], "parent": null}, {"root": "*semi-", "entries": [{"pie": "*semi-（半分）→ ラテン語 semis", "pie_roots": ["*semi-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "semi-", "meaning": "半分", "orig": "ラテン semis", "examples": "semicircle, semifinal, semiconductor"}, {"pie": "*semi-（半分）→ ギリシャ語 hemi（s→h 変化）", "pie_roots": ["*semi-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "hemi-", "meaning": "半分", "orig": "ギリシャ hemi", "examples": "hemisphere, hemicycle, hemiplegia"}], "parent": null}, {"root": "*sent-", "entries": [{"pie": "*sent-（感じる・行く）", "pie_roots": ["*sent-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "sen-", "meaning": "感じる", "orig": "ラテン sentire", "examples": "sense, sensitive, sentiment, consent, resent"}], "parent": null}, {"root": "*si", "entries": [{"pie": "*kʷod（どのように）+ *si（もし）→ ラテン語 quasi", "pie_roots": ["*kʷod", "*si"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "quasi-", "meaning": "あたかも〜のように・擬", "orig": "ラテン quasi", "examples": "quasi-isomorphism, quasigroup, quasi-category"}], "parent": null}, {"root": "*sinere", "entries": [{"pie": "*apo（離れて）+ *sinere（置く）→ *po-sinere", "pie_roots": ["*apo", "*sinere"], "is_compound": true, "origin": "ラテン", "type": "root", "form": "pon-", "meaning": "置く", "orig": "ラテン ponere", "examples": "compose, position, deposit, opponent, postpone"}], "parent": null}, {"root": "*skand-", "entries": [{"pie": "*skand-（登る・跳ぶ）", "pie_roots": ["*skand-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "scend-", "meaning": "登る・降りる", "orig": "ラテン scandere", "examples": "ascend, descend, transcend, condescend"}], "parent": null}, {"root": "*skei-", "entries": [{"pie": "*skei-（切る・分ける）", "pie_roots": ["*skei-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "cri", "meaning": "分ける・判断する", "orig": "ギリシャ krinein（分ける・判断する）", "examples": "critic, crisis, criterion, hypocrite, hypocrisy"}, {"pie": "*skei-（切る・分ける）", "pie_roots": ["*skei-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "sc", "meaning": "知る・区別する", "orig": "ラテン scire（知る）", "examples": "sc+ī+re（scire）→ science, conscience, conscious, omniscient, prescient"}], "parent": null}, {"root": "*sker-", "entries": [{"pie": "*sker-(*ker-)（曲がる）→ ラテン語 circum", "pie_roots": ["*sker-", "*ker-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "circum-", "meaning": "周りを", "orig": "ラテン circum", "examples": "circumference, circumnavigate, circumstance"}, {"pie": "*sker-(*ker-)（曲がる・回る）の重複形 *ki-kro-", "pie_roots": ["*sker-", "*ker-", "*ki-kro-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "circ", "meaning": "円・環", "orig": "ラテン circus ← ギリシャ語 kirkos/krikos（円・輪）", "examples": "circle, circuit, circulate, circus, circumference"}, {"pie": "*skribh-（切る・刻む）← *sker-(*ker-)（切る）の拡張形", "pie_roots": ["*skribh-", "*sker-", "*ker-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "scrib-", "meaning": "書く", "orig": "ラテン scribere", "examples": "describe, manuscript, inscription, subscribe"}, {"pie": "*sker-(*ker-)（切る・形作る）", "pie_roots": ["*sker-", "*ker-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ship", "meaning": "状態・技能・関係", "orig": "古英語 -scipe", "examples": "friendship, leadership, scholarship, citizenship"}], "parent": null}, {"root": "*skribh-", "entries": [{"pie": "*skribh-（切る・刻む）← *sker-(*ker-)（切る）の拡張形", "pie_roots": ["*skribh-", "*sker-", "*ker-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "scrib-", "meaning": "書く", "orig": "ラテン scribere", "examples": "describe, manuscript, inscription, subscribe"}], "parent": "*sker-"}, {"root": "*smei-", "entries": [{"pie": "*smei-（小さい）→ ギリシャ語 mikros（諸説あり）", "pie_roots": ["*smei-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "micr-", "meaning": "小さい", "orig": "ギリシャ mikros", "examples": "microscope, microchip, microphone, microwave"}], "parent": null}, {"root": "*sneh₁u-", "entries": [{"pie": "*sneh₁u-（腱・神経）→ ギリシャ語 neuron", "pie_roots": ["*sneh₁u-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "neur-", "meaning": "神経", "orig": "ギリシャ neuron", "examples": "neuroscience, neurology, neurotransmitter"}], "parent": null}, {"root": "*sol-", "entries": [{"pie": "*sol-（単独）← *se-（分離）", "pie_roots": ["*sol-", "*se-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "sol-", "meaning": "一人・孤独", "orig": "ラテン solus", "examples": "solo, solitary, solitude, desolate"}], "parent": "*se-"}, {"root": "*speis-", "entries": [{"pie": "*speis-（吹く・息をする）", "pie_roots": ["*speis-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "spir-", "meaning": "息・呼吸・精神", "orig": "ラテン spirare（息をする）", "examples": "inspire, spirit, respiration, conspire, expire, aspire"}], "parent": null}, {"root": "*spek-", "entries": [{"pie": "*spek-（見る・観察する）", "pie_roots": ["*spek-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "spec-", "meaning": "見る", "orig": "ラテン specere", "examples": "spectacle, inspect, suspect, aspect, species"}, {"pie": "*spek-（見る）", "pie_roots": ["*spek-"], "is_compound": false, "origin": "ギリシャ", "type": "suffix", "form": "-scope", "meaning": "観察装置", "orig": "ギリシャ skopein", "examples": "telescope, microscope, stethoscope, kaleidoscope"}], "parent": null}, {"root": "*spend-", "entries": [{"pie": "*spend-（引き伸ばす・吊るす）", "pie_roots": ["*spend-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "pend-", "meaning": "ぶら下がる・重さを量る", "orig": "ラテン pendere", "examples": "suspend, depend, expense, compensate"}], "parent": null}, {"root": "*stere-", "entries": [{"pie": "*stere-（広げる・積む）", "pie_roots": ["*stere-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "stru-", "meaning": "建てる・組む・積む", "orig": "ラテン struere（不定詞語幹 stru- + 過去分詞語幹 struct-）", "examples": "structure, construct, destroy, instruct, obstruct, construe"}], "parent": null}, {"root": "*swe-", "entries": [{"pie": "*swe-（自己）→ ギリシャ語 autos", "pie_roots": ["*swe-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "aut-", "meaning": "自動・自己", "orig": "ギリシャ autos", "examples": "automatic, autobiography, autonomy, autograph"}, {"pie": "*swe-(*se-)（自己）→ ゲルマン語 *selbaz", "pie_roots": ["*swe-", "*se-", "*selbaz"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "self-", "meaning": "自己", "orig": "古英語 self", "examples": "self-confidence, self-control, self-esteem"}], "parent": null}, {"root": "*sweḱs", "entries": [{"pie": "*sweḱs（六つ）→ ギリシャ語 hex", "pie_roots": ["*sweḱs"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "hex-", "meaning": "6つ", "orig": "ギリシャ hex", "examples": "hexagon, hexadecimal, hexameter"}, {"pie": "*sweḱs（六つ）→ ラテン語 sex", "pie_roots": ["*sweḱs"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "sex-", "meaning": "6つ", "orig": "ラテン sex", "examples": "sextuple, sextet, sextant"}], "parent": null}, {"root": "*sóh₂wl̥", "entries": [{"pie": "*sóh₂wl̥（太陽）", "pie_roots": ["*sóh₂wl̥"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "sol", "meaning": "太陽", "orig": "ラテン sol", "examples": "solar, solstice, parasol"}], "parent": null}, {"root": "*sē-", "entries": [{"pie": "*sē-（離れる・脇）", "pie_roots": ["*sē-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-side", "meaning": "〜の側・〜に沿った場所半接尾辞", "orig": "古英語 sīde", "examples": "inside, outside, alongside, lakeside, riverside"}], "parent": null}, {"root": "*tag-", "entries": [{"pie": "*tag-（触れる・触る）", "pie_roots": ["*tag-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "tang-", "meaning": "触れる", "orig": "ラテン tangere", "examples": "contact, tactile, tangible, contagious, intact"}], "parent": null}, {"root": "*teks-", "entries": [{"pie": "*teks-（作る・組み立てる）", "pie_roots": ["*teks-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "techn", "meaning": "技術・技巧", "orig": "ギリシャ techne", "examples": "technology, technique, technical, pyrotechnics"}], "parent": null}, {"root": "*tem-", "entries": [{"pie": "*tem-（切る）", "pie_roots": ["*tem-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "tom-", "meaning": "切る", "orig": "ギリシャ temnein", "examples": "anatomy, dichotomy, epitome, tome, appendectomy, lobotomy※-ectomy は ek-+tom+y、atom は a-+tom"}], "parent": null}, {"root": "*ten-", "entries": [{"pie": "*ten-（伸ばす）", "pie_roots": ["*ten-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "tend-", "meaning": "伸ばす・向かう", "orig": "ラテン tendere", "examples": "extend, tension, attend, intend, tendency"}], "parent": null}, {"root": "*terh₂-", "entries": [{"pie": "*terh₂-（越える・横切る）", "pie_roots": ["*terh₂-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "trans-", "meaning": "越えて・変換", "orig": "ラテン trans", "examples": "transport, translate, transmit, transform"}], "parent": null}, {"root": "*ters-", "entries": [{"pie": "*ters-（乾く・地）", "pie_roots": ["*ters-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "terr", "meaning": "土地・大地", "orig": "ラテン terra", "examples": "territory, terrain, terrestrial, Mediterranean"}], "parent": null}, {"root": "*tolkʷ-", "entries": [{"pie": "*tolkʷ-（話す）（諸説あり）", "pie_roots": ["*tolkʷ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "loq-", "meaning": "話す", "orig": "ラテン loqui", "examples": "eloquent, loquacious, locution, colloquial"}], "parent": null}, {"root": "*tragh-", "entries": [{"pie": "*tragh-（引く・引きずる）", "pie_roots": ["*tragh-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "tract", "meaning": "引く", "orig": "ラテン trahere / tractus", "examples": "attract, contract, extract, tractor, abstract"}], "parent": null}, {"root": "*tres-", "entries": [{"pie": "*tres-（震える・おびえる）", "pie_roots": ["*tres-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "terr", "meaning": "恐れ・恐怖（外から与えられる）", "orig": "ラテン terrere", "examples": "terror, terrify, terrible, deter"}], "parent": null}, {"root": "*treyes", "entries": [{"pie": "*tri-（三つ）← *treyes", "pie_roots": ["*tri-", "*treyes"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "tri-", "meaning": "3つ", "orig": "ラテン/ギリシャ tres/treis", "examples": "triangle, triple, tricolor, trilogy"}], "parent": null}, {"root": "*tri-", "entries": [{"pie": "*tri-（三つ）← *treyes", "pie_roots": ["*tri-", "*treyes"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "tri-", "meaning": "3つ", "orig": "ラテン/ギリシャ tres/treis", "examples": "triangle, triple, tricolor, trilogy"}], "parent": "*treyes"}, {"root": "*uber-", "entries": [{"pie": "*úper（上に・越えて）→ ゲルマン語 *uber-", "pie_roots": ["*úper", "*uber-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "over-", "meaning": "過度に・上に・完全に", "orig": "古英語 ofer", "examples": "overeat, overload, overwhelm, overcome, overjoyed"}], "parent": null}, {"root": "*ud-", "entries": [{"pie": "*ud-（外へ・上へ）→ ゲルマン語 *ut-", "pie_roots": ["*ud-", "*ut-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "out-", "meaning": "外へ・超えて・より優れて", "orig": "古英語 ut", "examples": "outdoor, outrun, outstanding, outcome"}], "parent": null}, {"root": "*un-", "entries": [{"pie": "*ne（否定粒子）→ ゲルマン語 *un-", "pie_roots": ["*ne", "*un-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "un-", "meaning": "否定・逆", "orig": "古英語 un-", "examples": "unhappy, undo, unfair, unlock, unkind"}], "parent": null}, {"root": "*upp-", "entries": [{"pie": "*úp（下から上へ）→ ゲルマン語 *upp-", "pie_roots": ["*úp", "*upp-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "up-", "meaning": "上へ・向上", "orig": "古英語 up", "examples": "update, upgrade, upbeat, uplifting"}], "parent": null}, {"root": "*ut-", "entries": [{"pie": "*ud-（外へ・上へ）→ ゲルマン語 *ut-", "pie_roots": ["*ud-", "*ut-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "out-", "meaning": "外へ・超えて・より優れて", "orig": "古英語 ut", "examples": "outdoor, outrun, outstanding, outcome"}], "parent": null}, {"root": "*wed-", "entries": [{"pie": "*wed-（水）→ ギリシャ語 hydōr", "pie_roots": ["*wed-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "hydr-", "meaning": "水", "orig": "ギリシャ hydor", "examples": "hydrogen, hydraulic, hydroelectric, hydrology"}, {"pie": "*wed-（水）", "pie_roots": ["*wed-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "hydr", "meaning": "水", "orig": "ギリシャ hydor", "examples": "hydrogen, hydraulic, hydrate, dehydrate"}], "parent": null}, {"root": "*weid-", "entries": [{"pie": "*weid-（見る・知る）", "pie_roots": ["*weid-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "vid-", "meaning": "見る", "orig": "ラテン videre", "examples": "video, visible, vision, evidence, supervise"}, {"pie": "*weid-（見る・知る）", "pie_roots": ["*weid-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-wise", "meaning": "〜の方向に・〜の様式で半接尾辞", "orig": "古英語 -wisan", "examples": "clockwise, likewise, otherwise, lengthwise"}], "parent": null}, {"root": "*wekʷ-", "entries": [{"pie": "*wekʷ-（話す・声を出す）", "pie_roots": ["*wekʷ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "voc-", "meaning": "声・呼ぶ", "orig": "ラテン vocare", "examples": "vocal, vocabulary, invoke, provoke, advocate"}], "parent": null}, {"root": "*wel-", "entries": [{"pie": "*wel-（望む・意志）→ 古英語 wel", "pie_roots": ["*wel-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "well-", "meaning": "良く・十分に", "orig": "古英語 wel", "examples": "well-being, well-known, well-done, welfare"}, {"pie": "*wel-（望む・意志）", "pie_roots": ["*wel-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "vol-", "meaning": "意志・望む", "orig": "ラテン velle", "examples": "volunteer, voluntary, benevolent, malevolent, volition"}], "parent": null}, {"root": "*wer-", "entries": [{"pie": "*wer-（曲げる・向ける・回す）", "pie_roots": ["*wer-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ver-", "meaning": "向ける・回す", "orig": "ラテン vertere", "examples": "convert, reverse, universe, version, divert"}, {"pie": "*wer-（曲げる・向ける・回す）", "pie_roots": ["*wer-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "ver-", "meaning": "変換・回転", "orig": "ラテン vertere", "examples": "version, convert, diverse, anniversary, reverse"}, {"pie": "*wer-（曲げる・向ける）", "pie_roots": ["*wer-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ward(s)", "meaning": "〜の方向へ半接尾辞", "orig": "古英語 -weard", "examples": "forward, inward, upward, eastward, homeward, backward"}], "parent": null}, {"root": "*weyḱ-", "entries": [{"pie": "*weyḱ-（家・住処）→ ギリシャ語 oikos", "pie_roots": ["*weyḱ-"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "ec-", "meaning": "環境・生態", "orig": "ギリシャ oikos", "examples": "ecology, ecosystem, ecofriendly, economy※economy は oikos+nomos+ia の複合語借用"}], "parent": null}, {"root": "*weǵʰ-", "entries": [{"pie": "*weǵʰ-（運ぶ）", "pie_roots": ["*weǵʰ-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "vect", "meaning": "運ぶ", "orig": "ラテン vehere/vectus", "examples": "vector, convex"}, {"pie": "*weǵʰ-（運ぶ・移動する）", "pie_roots": ["*weǵʰ-"], "is_compound": false, "origin": "古英語", "type": "suffix", "form": "-ways", "meaning": "〜の方向に・〜の様式で半接尾辞", "orig": "古英語 weges", "examples": "sideways, always, lengthways, crossways"}], "parent": null}, {"root": "*yeug-", "entries": [{"pie": "*yeug-（繋ぐ・結ぶ）", "pie_roots": ["*yeug-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "junct-", "meaning": "つなぐ", "orig": "ラテン jungere", "examples": "junction, conjunction, adjoin, injunction"}], "parent": null}, {"root": "*yewes-", "entries": [{"pie": "*yewes-（法・正義）", "pie_roots": ["*yewes-"], "is_compound": false, "origin": "ラテン", "type": "root", "form": "jus-", "meaning": "法・判断", "orig": "ラテン judex / jus", "examples": "judge, jury, justice, prejudice, jurisdiction"}], "parent": null}, {"root": "*úp", "entries": [{"pie": "*úp（下から）", "pie_roots": ["*úp"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "sub-", "meaning": "下・副・不十分", "orig": "ラテン sub", "examples": "submarine, subtitle, subway, substandard"}, {"pie": "*úp（下から）→ ギリシャ語 hypo", "pie_roots": ["*úp"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "hypo-", "meaning": "下・不足", "orig": "ギリシャ hypo", "examples": "hypothesis, hypodermic, hypoglycemia"}, {"pie": "*úp（下から上へ）→ ゲルマン語 *upp-", "pie_roots": ["*úp", "*upp-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "up-", "meaning": "上へ・向上", "orig": "古英語 up", "examples": "update, upgrade, upbeat, uplifting"}], "parent": null}, {"root": "*úper", "entries": [{"pie": "*úper（上に・越えて）← *úp + 局所副詞形成接尾辞 *-er", "pie_roots": ["*úper", "*-er"], "is_compound": true, "origin": "ラテン", "type": "prefix", "form": "super-", "meaning": "上・超えて", "orig": "ラテン super（→古仏 sur-）", "examples": "superhuman, supervise, surface, surpass"}, {"pie": "*úper（上に）→ ギリシャ語 hyper", "pie_roots": ["*úper"], "is_compound": false, "origin": "ギリシャ", "type": "prefix", "form": "hyper-", "meaning": "過剰・超", "orig": "ギリシャ hyper", "examples": "hyperactive, hyperbole, hypertension"}, {"pie": "*úper（上に・越えて）→ ゲルマン語 *uber-", "pie_roots": ["*úper", "*uber-"], "is_compound": false, "origin": "古英語", "type": "prefix", "form": "over-", "meaning": "過度に・上に・完全に", "orig": "古英語 ofer", "examples": "overeat, overload, overwhelm, overcome, overjoyed"}], "parent": "*úp"}, {"root": "*ǵʰeslo-", "entries": [{"pie": "*ǵʰeslo-（千）", "pie_roots": ["*ǵʰeslo-"], "is_compound": false, "origin": "ギリシャ", "type": "root", "form": "kil-", "meaning": "1000", "orig": "ギリシャ khilioi（kilo- は kil- + 連結母音 -o-）", "examples": "kilogram, kilometer, kilowatt, kilobyte"}], "parent": null}, {"root": "*ḱm̥tóm", "entries": [{"pie": "*ḱm̥tóm（百）→ ラテン語 centum", "pie_roots": ["*ḱm̥tóm"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "cent-", "meaning": "100", "orig": "ラテン centum", "examples": "century, percent, centimeter, cent"}, {"pie": "*ḱm̥tóm × 10（千）→ ラテン語 mille", "pie_roots": ["*ḱm̥tóm"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "milli-", "meaning": "1000 / 1000分の1", "orig": "ラテン mille", "examples": "millennium, millimeter, millisecond"}], "parent": null}, {"root": "*ṷret-", "entries": [{"pie": "*ṷret-（後ろに）← ラテン語内で発達（PIE不明）", "pie_roots": ["*ṷret-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "re-", "meaning": "再び・元に戻る", "orig": "ラテン re-", "examples": "rewrite, return, rebuild, reconsider, reform"}, {"pie": "*ṷret-（後ろに）← ラテン語内で発達（PIE不明）", "pie_roots": ["*ṷret-"], "is_compound": false, "origin": "ラテン", "type": "prefix", "form": "retro-", "meaning": "後ろに・過去に", "orig": "ラテン retro", "examples": "retrograde, retrospect, retro, retrofit"}], "parent": null}];
+const TYPE_LABEL = {prefix:'接頭辞', root:'語根', suffix:'接尾辞'};
+
+function extractMeaning(pie) {
+  const m = pie.match(/（([^）]+)）/);
+  return m ? m[1].replace(/[→←].*/,'').trim() : '';
+}
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function highlight(text, query) {
+  if (!query) return text;
+  return text.replace(new RegExp('(' + escapeRe(query) + ')', 'gi'), '<mark class="hl">$1</mark>');
+}
+
+function buildCard(entry, currentRoot, query, modes) {
+  const card = document.createElement('div');
+  card.className = 'morpheme-card';
+
+  const formEl = document.createElement('div');
+  formEl.className = 'mc-form ' + entry.type;
+  formEl.textContent = entry.form;
+
+  const typeEl = document.createElement('div');
+  typeEl.className = 'mc-type ' + entry.type;
+  typeEl.textContent = TYPE_LABEL[entry.type];
+
+  const meaningEl = document.createElement('div');
+  meaningEl.className = 'mc-meaning';
+  meaningEl.innerHTML = highlight(entry.meaning, query);
+
+  card.appendChild(formEl);
+  card.appendChild(typeEl);
+  card.appendChild(meaningEl);
+
+  // PIE語根表示
+  const pieEl = document.createElement('div');
+  pieEl.className = 'mc-pie';
+  if (entry.is_compound && entry.pie_roots.length > 1) {
+    entry.pie_roots.forEach((root, i) => {
+      if (i > 0) {
+        const plus = document.createElement('span');
+        plus.className = 'pie-plus';
+        plus.textContent = '+';
+        pieEl.appendChild(plus);
+      }
+      const rootEl = document.createElement('span');
+      rootEl.className = root === currentRoot ? 'compound-current' : 'compound-other';
+      rootEl.innerHTML = highlight(root, query);
+      pieEl.appendChild(rootEl);
+    });
+  } else {
+    const rootEl = document.createElement('span');
+    rootEl.className = 'pie-root';
+    rootEl.innerHTML = highlight(entry.pie_roots[0] || '', query);
+    pieEl.appendChild(rootEl);
+  }
+  card.appendChild(pieEl);
+
+  if (entry.orig) {
+    const origEl = document.createElement('div');
+    origEl.className = 'mc-orig';
+    origEl.innerHTML = highlight(entry.orig, query);
+    card.appendChild(origEl);
+  }
+  if (entry.examples) {
+    const exEl = document.createElement('div');
+    exEl.className = 'mc-ex';
+    exEl.innerHTML = highlight(entry.examples, query);
+    card.appendChild(exEl);
+  }
+
+  return card;
+}
+
+// rootをキーにしたマップ
+const DATA_MAP = Object.fromEntries(DATA.map(item => [item.root, item]));
+
+function buildItem(item, query, isChild) {
+  const div = document.createElement('div');
+  div.className = isChild ? 'root-item root-child' : 'root-item';
+
+  const children = DATA.filter(d => d.parent === item.root);
+  const directCount = item.entries.length;
+  const childCount = children.reduce((s, c) => s + c.entries.length, 0);
+  const isMulti = directCount > 1 || childCount > 0;
+
+  const meaning = extractMeaning(item.entries[0]?.pie || '');
+
+  if (isChild) {
+    // 子グループ：ヘッダーはアコーディオン
+    const header = document.createElement('div');
+    header.className = 'root-header';
+    header.innerHTML = `
+      <div class="root-form">${highlight(item.root, query)}</div>
+      <div class="root-meaning">${highlight(meaning, query)}</div>
+      <div class="root-count${directCount > 1 ? ' multi' : ''}">${directCount} 形態素</div>
+      <div class="root-toggle">▶</div>
+    `;
+    const body = document.createElement('div');
+    body.className = 'root-body';
+    item.entries.forEach(e => body.appendChild(buildCard(e, item.root, query)));
+    header.addEventListener('click', () => div.classList.toggle('open'));
+    div.appendChild(header);
+    div.appendChild(body);
+  } else {
+    // 親グループ：ヘッダーは常時表示、直接エントリーはアコーディオン
+    const header = document.createElement('div');
+    header.className = 'root-header root-parent-header';
+    header.innerHTML = `
+      <div class="root-form">${highlight(item.root, query)}</div>
+      <div class="root-meaning">${highlight(meaning, query)}</div>
+      <div class="root-count${isMulti ? ' multi' : ''}">${directCount + childCount} 形態素</div>
+      ${directCount > 0 ? '<div class="root-toggle">▶</div>' : '<div style="width:14px"></div>'}
+    `;
+
+    // 直接エントリーがあればアコーディオン
+    if (directCount > 0) {
+      const body = document.createElement('div');
+      body.className = 'root-body';
+      item.entries.forEach(e => body.appendChild(buildCard(e, item.root, query)));
+      header.addEventListener('click', () => div.classList.toggle('open'));
+      div.appendChild(header);
+      div.appendChild(body);
+    } else {
+      div.appendChild(header);
+    }
+
+    // 子グループは常時表示
+    if (children.length > 0) {
+      const childWrap = document.createElement('div');
+      childWrap.className = 'child-group-wrap';
+      children.forEach(child => childWrap.appendChild(buildItem(child, query, true)));
+      div.appendChild(childWrap);
+    }
+  }
+
+  return div;
+}
+
+const mainEl = document.getElementById('main');
+let currentFilter = new Set(['all']);
+let currentQuery = '';
+let activeModes = new Set(['form', 'meaning', 'pie']);
+
+function matchEntry(entry, q) {
+  if (activeModes.has('form')     && entry.form.toLowerCase().includes(q)) return true;
+  if (activeModes.has('meaning')  && entry.meaning.toLowerCase().includes(q)) return true;
+  if (activeModes.has('pie')      && entry.pie.toLowerCase().includes(q)) return true;
+  if (activeModes.has('orig')     && entry.orig.toLowerCase().includes(q)) return true;
+  if (activeModes.has('examples') && entry.examples.toLowerCase().includes(q)) return true;
+  return false;
+}
+
+function itemMatches(item, q) {
+  if (!q) return true;
+  const rootMatch = activeModes.has('pie') && item.root.toLowerCase().includes(q);
+  const entryMatch = item.entries.some(e => matchEntry(e, q));
+  // 子グループにマッチするものがあればその親もマッチ
+  const childMatch = DATA.filter(d => d.parent === item.root).some(c => itemMatches(c, q));
+  return rootMatch || entryMatch || childMatch;
+}
+
+function render() {
+  mainEl.innerHTML = '';
+  const q = currentQuery.toLowerCase();
+  let visible = 0;
+
+  DATA.forEach(item => {
+    // 子グループは親の中に入れるのでトップレベルでは表示しない
+    if (item.parent) return;
+
+    const allF = currentFilter.has('all');
+    if (!allF && currentFilter.has('multi')    && item.entries.length < 2) return;
+    if (!allF && currentFilter.has('compound') && !item.entries.some(e => e.is_compound)) return;
+    if (!allF) {
+      const types = new Set(item.entries.map(e => e.type));
+      const wantsPrefix = currentFilter.has('prefix');
+      const wantsRoot   = currentFilter.has('root');
+      const wantsSuffix = currentFilter.has('suffix');
+      const typeFilter  = wantsPrefix || wantsRoot || wantsSuffix;
+      if (typeFilter && !( (wantsPrefix && types.has('prefix')) || (wantsRoot && types.has('root')) || (wantsSuffix && types.has('suffix')) )) return;
+    }
+
+    if (!itemMatches(item, q)) return;
+
+    const el = buildItem(item, q, false);
+    if (q) el.classList.add('open');
+    mainEl.appendChild(el);
+    visible++;
+  });
+
+  document.getElementById('hintTop').textContent =
+    (q || !currentFilter.has('all')) ? visible + ' 件表示' : '';
+}
+
+// 統計
+document.getElementById('statRoots').textContent = DATA.length;
+document.getElementById('statEntries').textContent = DATA.reduce((s,d) => s + d.entries.length, 0);
+document.getElementById('statMulti').textContent = DATA.filter(d => d.entries.length > 1).length;
+
+// 検索（ナビバー）
+const searchInputTop = document.getElementById('searchInputTop');
+const clearBtnTop = document.getElementById('clearBtnTop');
+searchInputTop.addEventListener('input', () => {
+  currentQuery = searchInputTop.value;
+  clearBtnTop.style.display = currentQuery ? 'block' : 'none';
+  render();
+});
+clearBtnTop.addEventListener('click', () => {
+  searchInputTop.value = ''; currentQuery = '';
+  clearBtnTop.style.display = 'none';
+  _groupViewBuilt = false;
+  render();
+  if (currentTab === 'groups') buildGroupView('');
+});
+
+// FAB
+const fab = document.getElementById('fab');
+const fabSheet = document.getElementById('fabSheet');
+const fabOverlay = document.getElementById('fabOverlay');
+function openSheet() { fabSheet.classList.add('show'); fabOverlay.classList.add('show'); fab.classList.add('open'); fab.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'; }
+function closeSheet() { fabSheet.classList.remove('show'); fabOverlay.classList.remove('show'); fab.classList.remove('open'); fab.innerHTML = '<svg width="16" height="12" viewBox="0 0 16 12" fill="none"><rect width="16" height="1.5" rx="0.75" fill="currentColor"/><rect y="5.25" width="16" height="1.5" rx="0.75" fill="currentColor"/><rect y="10.5" width="16" height="1.5" rx="0.75" fill="currentColor"/></svg>'; }
+fab.addEventListener('click', () => fabSheet.classList.contains('show') ? closeSheet() : openSheet());
+fabOverlay.addEventListener('click', closeSheet);
+
+// 検索モード
+document.querySelectorAll('#modeBtns .cbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const m = btn.dataset.m;
+    btn.classList.toggle('active');
+    if (btn.classList.contains('active')) {
+      activeModes.add(m);
+    } else {
+      activeModes.delete(m);
+      if (activeModes.size === 0) {
+        // 最低1つはactive
+        btn.classList.add('active');
+        activeModes.add(m);
+      }
+    }
+    render();
+  });
+});
+
+// フィルタ
+document.querySelectorAll('#filterBtns .cbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const f = btn.dataset.f;
+    if (f === 'all') {
+      currentFilter = new Set(['all']);
+    } else {
+      currentFilter.delete('all');
+      if (currentFilter.has(f)) {
+        currentFilter.delete(f);
+        if (currentFilter.size === 0) currentFilter.add('all');
+      } else {
+        currentFilter.add(f);
+      }
+    }
+    document.querySelectorAll('#filterBtns .cbtn').forEach(b => {
+      b.classList.toggle('active',
+        currentFilter.has(b.dataset.f) || (currentFilter.has('all') && b.dataset.f === 'all'));
+    });
+    render();
+  });
+});
+
+render();
+// グループビューを事前構築しておく（タブ切り替え時のラグを防ぐ）
+setTimeout(() => buildGroupView(''), 0);
+const GROUPS = [
+  {
+    name: "否定・反対", en: "Negation / Opposition", color: "#c86e6e",
+    roots: ["*ne", "*n̥-", "*un-", "*dus-", "*h₂enti", "*-teros", "*kom-"],
+  },
+  {
+    name: "時間・順序", en: "Time / Sequence", color: "#c8956e",
+    roots: ["*prai-", "*apo", "*ṷret-", "*fura-"],
+  },
+  {
+    name: "位置・方向", en: "Position / Direction", color: "#c8a96e",
+    roots: ["*úp", "*úper", "*uber-", "*upp-", "*ud-", "*ut-", "*egʰs", "*en", "*h₁epi", "*h₂epo", "*h₂embʰi", "*h₂ed", "*opi", "*kom", "*terh₂-", "*per-", "*me", "*semi-", "*al-", "*de-", "*n̥dʰo", "*krews-"],
+  },
+  {
+    name: "数・量", en: "Number / Quantity", color: "#c8c86e",
+    roots: ["*oi-no-", "*dwo", "*treyes", "*kʷetwor-", "*penkʷe", "*sweḱs", "*oḱtō", "*deḱm", "*ḱm̥tóm", "*ǵʰeslo-", "*mel-", "*pelH-", "*peh₂-", "*maḱ-", "*smei-", "*meǵ-"],
+  },
+  {
+    name: "性質・状態", en: "Quality / State", color: "#6ec88a",
+    roots: ["*h₁su-", "*dʰeǵʰ-", "*wel-", "*missa-", "*newos-", "*swe-", "*se-", "*selbaz", "*sem-", "*kʷod", "*si", "*dʰubʰ-", "*-er"],
+  },
+  {
+    name: "科学・技術", en: "Science / Technology", color: "#6ec8c8",
+    roots: ["*kʷel-", "*sneh₁u-", "*weyḱ-", "*gʷiH-", "*teks-", "*gʷʰī-"],
+  },
+  {
+    name: "動作・運動", en: "Motion / Action", color: "#6e9fc8",
+    roots: ["*meith-", "*meue-", "*deuk-", "*ghredh-", "*bʰer-", "*pel-", "*ten-", "*sed-", "*gʷā-", "*wer-", "*tragh-", "*skand-", "*kers-", "*weǵʰ-", "*yeug-", "*dʰeh₁-", "*keh₂p-", "*spend-", "*bʰleu-", "*sinere", "*leu-"],
+  },
+  {
+    name: "感覚・知覚", en: "Sense / Perception", color: "#9f6ec8",
+    roots: ["*weid-", "*spek-", "*h₃ekʷ-", "*h₂ew-", "*tag-", "*sent-", "*kwenth-", "*bʰeh₂-"],
+  },
+  {
+    name: "言語・思考", en: "Language / Thought", color: "#b87eb8",
+    roots: ["*leg-", "*deik-", "*wekʷ-", "*tolkʷ-", "*gerbh-", "*gneh₃-", "*skei-", "*dngʰu-", "*h₁nómn̥", "*pew-"],
+  },
+  {
+    name: "自然・物質", en: "Nature / Matter", color: "#7ec98f",
+    roots: ["*h₂ekʷā-", "*wed-", "*gʷher-", "*h₁egni-", "*péh₂wr̥", "*sóh₂wl̥", "*h₂ster-", "*h₂weh₁-", "*lewk-", "*ghel-", "*bʰuH-", "*ters-", "*h₂eḱ-", "*kel-"],
+  },
+  {
+    name: "生命・身体", en: "Life / Body", color: "#c97e7e",
+    roots: ["*gʷeyH-", "*mer-", "*krep-", "*man-", "*ped-", "*kaput-", "*kerd-", "*h₁dónts", "*der-", "*gras-", "*speis-", "*gʷerH-", "*psyche"],
+  },
+  {
+    name: "構造・変化", en: "Structure / Change", color: "#7eb8c9",
+    roots: ["*stere-", "*reup-", "*bʰreg-", "*dʰer-", "*genH₁-", "*tem-", "*ker-", "*sker-", "*ki-kro-"],
+  },
+  {
+    name: "数・計算", en: "Number / Calculation", color: "#9bc97e",
+    roots: ["*meh₁-", "*nem-", "*poti-", "*dʰewH-", "*bʰewg-"],
+  },
+  {
+    name: "感情・心理", en: "Emotion / Psychology", color: "#e8a87c",
+    roots: ["*men-", "*amma-", "*bʰil-", "*bʰeidʰ-", "*gāu-", "*bʰegʷ-", "*dʰewbʰ-", "*tres-", "*del-"],
+  },
+  {
+    name: "社会・関係", en: "Society / Relation", color: "#a8c97e",
+    roots: ["*sekʷ-", "*pleh₁-", "*dem-", "*h₃reǵ-", "*leudʰ-", "*yewes-", "*deh₂-"],
+  },
+  {
+    name: "動作主（接尾辞）", en: "Agent Nominalization", color: "#c8a96e",
+    roots: ["*-tōr", "*-ere-", "*-ōs"],
+  },
+  {
+    name: "動詞化（接尾辞）", en: "Verbalization", color: "#c86e9f",
+    roots: ["*-idyé-", "*-to-", "*dʰeh₁-"],
+  },
+  {
+    name: "行為・結果名詞化", en: "Action Nominalization", color: "#6e9fc8",
+    roots: ["*-ti-", "*-tu-", "*-on-", "*-mo-", "*-tiko-", "*-ih₂-", "*-nt-"],
+  },
+  {
+    name: "抽象・性質名詞化", en: "Abstract Nominalization", color: "#9988cc",
+    roots: ["*-teh₂-", "*-yeh₂-", "*-eh₂", "*-om", "*-os", "*-oi", "*-ōs"],
+  },
+  {
+    name: "形容詞化（接尾辞）", en: "Adjectivalization", color: "#6ec88a",
+    roots: ["*-no-", "*-ko-", "*-wo-", "*-isko-", "*-teros", "*-id-", "*pelə-", "*leyg-", "*sem-", "*bʰer-", "*bʰendʰ-", "*bʰew-", "*sē-", "*weid-", "*wer-", "*weǵʰ-", "*meǵ-", "*h₂arHkʷ-"],
+  },
+  {
+    name: "道具・手段", en: "Instrumental", color: "#c8a06e",
+    roots: ["*-tlo-", "*-dʰlo-", "*preyH-", "*bʰuH-"],
+  },
+  {
+    name: "指小辞", en: "Diminutive", color: "#7ec9b8",
+    roots: ["*-lo-", "*-linga-", "*-is"],
+  },
+];
+
+function escapeReG(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function hlG(text, q) {
+  if (!q) return text;
+  return text.replace(new RegExp('(' + escapeReG(q) + ')', 'gi'), '<mark class="hl">$1</mark>');
+}
+
+let _groupViewBuilt = false;
+function buildGroupView(q) {
+  const container = document.getElementById('groupView');
+  const sq = (q || '').toLowerCase();
+
+  // 検索なしの初回ビルドはキャッシュ
+  if (!sq && _groupViewBuilt) return;
+  if (!sq) _groupViewBuilt = true;
+
+  container.innerHTML = '';
+
+  GROUPS.forEach(g => {
+    // g.roots配列からDATAを参照してエントリーを収集
+    const items = (g.roots || []).map(r => DATA_MAP[r]).filter(Boolean);
+
+    // 各itemのentriesを一覧化（形態素カード形式）
+    const allEntries = [];
+    items.forEach(item => {
+      item.entries.forEach(e => allEntries.push({ item, entry: e }));
+      // 子グループのエントリーも含める
+      DATA.filter(d => d.parent === item.root).forEach(child => {
+        child.entries.forEach(e => allEntries.push({ item: child, entry: e }));
+      });
+    });
+
+    const matched = allEntries.filter(({ item, entry: e }) => {
+      if (!sq) return true;
+      return item.root.toLowerCase().includes(sq) ||
+             e.form.toLowerCase().includes(sq) ||
+             e.meaning.toLowerCase().includes(sq) ||
+             e.pie.toLowerCase().includes(sq) ||
+             e.examples.toLowerCase().includes(sq);
+    });
+
+    if (sq && matched.length === 0) return;
+
+    const card = document.createElement('div');
+    card.className = 'group-card';
+    if (sq) card.classList.add('open');
+
+    const count = (sq ? matched : allEntries).length;
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.innerHTML = `
+      <div class="group-dot" style="background:${g.color}; box-shadow:0 0 6px ${g.color}55;"></div>
+      <div class="group-name" style="color:${g.color};">${g.name}</div>
+      <div class="group-en">${g.en}</div>
+      <div class="root-count${count > 3 ? ' multi' : ''}" style="margin-left:auto;">${count} 形態素</div>
+      <div class="group-toggle">▶</div>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'group-body';
+    const entriesEl = document.createElement('div');
+    entriesEl.className = 'g-entries';
+
+    (sq ? matched : allEntries).forEach(({ item, entry: e }) => {
+      const row = document.createElement('div');
+      row.className = 'g-entry' + (sq ? ' search-match' : '');
+
+      // PIE語根
+      const pieEl = document.createElement('div');
+      pieEl.className = 'g-pie';
+      pieEl.innerHTML = hlG(item.root, sq);
+      row.appendChild(pieEl);
+
+      // 形態素形式とタイプ
+      const formsEl = document.createElement('div');
+      formsEl.className = 'g-forms';
+      const tag = document.createElement('span');
+      tag.className = 'g-form-tag ' + e.type;
+      tag.innerHTML = hlG(e.form, sq);
+      formsEl.appendChild(tag);
+      row.appendChild(formsEl);
+
+      // 意味
+      const meaningEl = document.createElement('div');
+      meaningEl.className = 'g-note';
+      meaningEl.innerHTML = hlG(e.meaning, sq);
+      row.appendChild(meaningEl);
+
+      entriesEl.appendChild(row);
+    });
+
+    body.appendChild(entriesEl);
+    header.addEventListener('click', () => card.classList.toggle('open'));
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+  });
+}
+
+// タブ切り替え
+let currentTab = 'roots';
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    const isRoots = currentTab === 'roots';
+    document.getElementById('main').style.display = isRoots ? '' : 'none';
+    document.getElementById('groupView').style.display = isRoots ? 'none' : 'block';
+    if (!isRoots) { if (currentQuery) buildGroupView(currentQuery); }
+  });
+});</script>
+</body>
+</html>
